@@ -9,6 +9,7 @@ edition = "2021"
 crossterm = "0.25.0"
 registry = "1.2.1"
 is_elevated = "0.1.2"
+clearscreen = "1.0.10"
 
 [profile.release]
 opt-level = 'z'     # Optimize for size.
