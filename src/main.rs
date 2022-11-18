@@ -4,7 +4,7 @@ use crossterm::{
     terminal::{Clear, ClearType, SetTitle},
     Result,
 };
-use nc_renamer::{show_about, wait_command};
+use nc_renamer::{install, show_about, wait_command};
 use std::io::stdout;
 
 fn main() -> Result<()> {
@@ -22,6 +22,7 @@ fn main() -> Result<()> {
             nc_renamer::Command::ShowAbout => {
                 show_about();
             }
+            nc_renamer::Command::Install => install()?,
         }
     }
     execute!(stdout(), Show,)?;

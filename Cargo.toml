@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 crossterm = "0.25.0"
-registry = "1.2.1"
+registry = "1.2.2"
 is_elevated = "0.1.2"
 clearscreen = "1.0.10"
 
