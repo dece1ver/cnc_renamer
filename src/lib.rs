@@ -12,6 +12,7 @@ use std::{env, fs, io};
 
 pub enum Command {
     Install,
+    Uninstall,
     ShowAbout,
     Exit,
 }
@@ -22,6 +23,7 @@ enum Status {
 }
 
 const INSTALL_PATH: &str = r"C:\ProgramData\dece1ver\nc_renamer";
+const EXECUTABLE_PATH: &str = r"C:\ProgramData\dece1ver\nc_renamer\nc_renamer.exe";
 const REG_BASE_PATH: &str = r"*\shell\nc_renamer";
 const REG_COMMAND_PATH: &str = r"*\shell\nc_renamer\command";
 
@@ -59,7 +61,14 @@ fn return_back() {
 }
 
 fn is_installed() -> bool {
-    false
+    if !Path::new(EXECUTABLE_PATH).exists() {
+        return false;
+    } else {
+        if let Err(_) = Hive::ClassesRoot.open(REG_BASE_PATH, Security::Read) {
+            return false;
+        }
+    }
+    true
 }
 
 pub fn wait_command() -> Command {
@@ -158,7 +167,12 @@ pub fn wait_command() -> Command {
                 }
                 KeyCode::Char('1') => {
                     if is_elevated() {
-                        command = Command::Install;
+                        if is_installed() {
+                            command = Command::Uninstall;
+                        } else {
+                            command = Command::Install;
+                        }
+
                         break;
                     }
                 }
@@ -166,7 +180,7 @@ pub fn wait_command() -> Command {
                     command = Command::ShowAbout;
                     break;
                 }
-                //_ => println!("{:?}", event.code),
+                // _ => println!("{:?}", event.code),
                 _ => (),
             }
         }
@@ -177,35 +191,21 @@ pub fn wait_command() -> Command {
 
 pub fn show_about() {
     clearscreen::clear().unwrap();
-    execute!(stdout(), Print("Программа переименовывает файлы управляющих программ по названию самой управляющей программы.\n
-Поддерживаемые СЧПУ:
-* Fanuc 0i           [ O0001(НАЗВАНИЕ) ]
-* Fanuc 0i-*F        [ <НАЗВАНИЕ> ]
-* Mazatrol Smart     [ .PBG | .PBD ]
-* Sinumerik 840D sl  [ MSG (\"НАЗВАНИЕ\") ]
-* Hiedenhain         [ BEGIN PGM НАЗВАНИЕ MM ]
-
-Использование программы подразумевается вызовом через контекстное меню (ПКМ) по переменовываемым файлам.
-Работа программы происходит без каких-либо уведомлений.
-Если программа определяет файл как УП, то происходит переименование.
-Если файл уже существует, он не перезаписывается, а создается копия с добавлением номера."),).unwrap();
-
+    print!("{}", include_str!("../res/about"));
     return_back()
 }
 
 pub fn install() -> io::Result<()> {
     clearscreen::clear().unwrap();
     let args: Vec<String> = env::args().collect();
-    let executable_path = Path::new(INSTALL_PATH).join("nc_renamer.exe");
-    let reg_executable_path = executable_path.to_str().unwrap();
 
-    execute!(stdout(), Print("Создание директории..."))?;
+    execute!(stdout(), Print("Создание директории......"))?;
     match fs::create_dir_all(INSTALL_PATH) {
         Ok(_) => print_status(Status::Ok),
         Err(_) => print_status(Status::Bad),
     }
-    execute!(stdout(), Print("\nКопирование программы..."))?;
-    match fs::copy(&args[0], &executable_path) {
+    execute!(stdout(), Print("\nКопирование программы...."))?;
+    match fs::copy(&args[0], EXECUTABLE_PATH) {
         Ok(_) => print_status(Status::Ok),
         Err(_) => print_status(Status::Bad),
     }
@@ -215,18 +215,18 @@ pub fn install() -> io::Result<()> {
     match key {
         Ok(key) => {
             print_status(Status::Ok);
-            execute!(stdout(), Print("\nВнесение параметров..."))?;
+            execute!(stdout(), Print("\nВнесение параметров......"))?;
 
             match (
                 key.set_value("", &Data::String("Переименовать УП".parse().unwrap())),
                 key.set_value(
                     "Icon",
-                    &Data::String(format!("\"{}\",0", reg_executable_path).parse().unwrap()),
+                    &Data::String(format!("\"{}\",2", EXECUTABLE_PATH).parse().unwrap()),
                 ),
             ) {
                 (Ok(_), Ok(_)) => {
                     print_status(Status::Ok);
-                    execute!(stdout(), Print("\nУстановка комманды..."))?;
+                    execute!(stdout(), Print("\nУстановка команды........"))?;
                     let key = Hive::ClassesRoot.create(REG_COMMAND_PATH, Security::Write);
                     match key {
                         Ok(key) => {
@@ -234,9 +234,7 @@ pub fn install() -> io::Result<()> {
                                 .set_value(
                                     "",
                                     &Data::String(
-                                        format!("\"{}\" \"%1\"", reg_executable_path)
-                                            .parse()
-                                            .unwrap(),
+                                        format!("\"{}\" \"%1\"", EXECUTABLE_PATH).parse().unwrap(),
                                     ),
                                 )
                                 .is_ok()
@@ -262,13 +260,31 @@ pub fn install() -> io::Result<()> {
     Ok(())
 }
 
+pub fn uninstall() -> io::Result<()> {
+    clearscreen::clear().unwrap();
+
+    execute!(stdout(), Print("Удаление из контекстного меню..."))?;
+    match Hive::ClassesRoot.delete(REG_BASE_PATH, true) {
+        Ok(_) => print_status(Status::Ok),
+        Err(_) => print_status(Status::Bad),
+    }
+
+    execute!(stdout(), Print("\nУдаление файла.................."))?;
+    match fs::remove_file(EXECUTABLE_PATH) {
+        Ok(_) => print_status(Status::Ok),
+        Err(_) => print_status(Status::Bad),
+    }
+    return_back();
+    Ok(())
+}
+
 fn print_status(status: Status) {
     match status {
         Status::Ok => {
             execute!(
                 stdout(),
                 SetForegroundColor(Color::Green),
-                Print("Ok"),
+                Print("[Ok]"),
                 ResetColor
             )
             .unwrap();
@@ -277,7 +293,7 @@ fn print_status(status: Status) {
             execute!(
                 stdout(),
                 SetForegroundColor(Color::Red),
-                Print("Неудача"),
+                Print("[Неудача]"),
                 ResetColor
             )
             .unwrap();

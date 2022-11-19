@@ -2,8 +2,12 @@
 name = "nc_renamer"
 version = "0.1.0"
 edition = "2021"
+build = "src/build.rs"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[package.metadata.winres]
+LegalCopyright = "dece1ver © 2022"
 
 [dependencies]
 crossterm = "0.25.0"
@@ -17,3 +21,6 @@ lto = true          # Enable Link Time Optimization
 codegen-units = 1   # Reduce number of codegen units to increase optimizations.
 panic = 'abort'     # Abort on panic
 strip = true        # Strip symbols from binary
+
+[build-dependencies]
+winres = "0.1"
