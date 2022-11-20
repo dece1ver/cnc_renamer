@@ -1,3 +1,5 @@
+mod reader;
+
 use crossterm::{
     event::{read, Event, KeyCode},
     execute,
@@ -8,7 +10,7 @@ use is_elevated::is_elevated;
 use registry::{Data, Hive, Security};
 use std::io::stdout;
 use std::path::Path;
-use std::{env, fs, io};
+use std::{fs, io};
 
 pub enum Command {
     Install,
@@ -23,17 +25,15 @@ enum Status {
 }
 
 const INSTALL_PATH: &str = r"C:\ProgramData\dece1ver\cnc_renamer";
-const EXECUTABLE_PATH: &str = r"C:\ProgramData\dece1ver\cnc_renamer\cncr.exe";
+const INSTALL_EXECUTABLE_PATH: &str = r"C:\ProgramData\dece1ver\cnc_renamer\cncr.exe";
 const REG_BASE_PATH: &str = r"*\shell\cnc_renamer";
 const REG_COMMAND_PATH: &str = r"*\shell\cnc_renamer\command";
 
 pub fn pause() {
     execute!(stdout(), Print("Нажмите любую клавишу для продолжения..."),).unwrap();
     loop {
-        if let Event::Key(event) = read().unwrap() {
-            if let KeyCode::Char(_) = event.code {
-                break;
-            }
+        if let Event::Key(_) = read().unwrap() {
+            break;
         }
     }
 }
@@ -61,7 +61,7 @@ fn return_back() {
 }
 
 fn is_installed() -> bool {
-    if !Path::new(EXECUTABLE_PATH).exists() {
+    if !Path::new(INSTALL_EXECUTABLE_PATH).exists() {
         return false;
     } else {
         if let Err(_) = Hive::ClassesRoot.open(REG_BASE_PATH, Security::Read) {
@@ -101,7 +101,7 @@ pub fn wait_command() -> Command {
             SetForegroundColor(Color::Yellow),
             Print("\n[1]"),
             ResetColor,
-            Print(" Установить CNC Renamer и добавить в контекстное меню."),
+            Print(" Установить CNC Renamer и добавить в контекстное меню"),
         )
         .unwrap();
     } else if !is_elevated() && !is_installed() {
@@ -110,7 +110,7 @@ pub fn wait_command() -> Command {
             SetForegroundColor(Color::Yellow),
             Print("\n[1]"),
             ResetColor,
-            Print(" Установить CNC Renamer и добавить в контекстное меню. "),
+            Print(" Установить CNC Renamer и добавить в контекстное меню "),
             SetForegroundColor(Color::Red),
             Print("(недоступно)"),
             ResetColor
@@ -122,7 +122,7 @@ pub fn wait_command() -> Command {
             SetForegroundColor(Color::Yellow),
             Print("\n[1]"),
             ResetColor,
-            Print(" Удалить CNC Renamer и убрать из контекстного меню."),
+            Print(" Удалить CNC Renamer и убрать из контекстного меню"),
         )
         .unwrap();
     } else {
@@ -131,7 +131,7 @@ pub fn wait_command() -> Command {
             SetForegroundColor(Color::Yellow),
             Print("\n[1]"),
             ResetColor,
-            Print(" Удалить CNC Renamer и убрать из контекстного меню. "),
+            Print(" Удалить CNC Renamer и убрать из контекстного меню "),
             SetForegroundColor(Color::Red),
             Print("(недоступно)"),
             ResetColor
@@ -195,9 +195,8 @@ pub fn show_about() {
     return_back()
 }
 
-pub fn install() -> io::Result<()> {
+pub fn install(executable_path: &String) -> io::Result<()> {
     clearscreen::clear().unwrap();
-    let args: Vec<String> = env::args().collect();
 
     execute!(stdout(), Print("Создание директории......"))?;
     match fs::create_dir_all(INSTALL_PATH) {
@@ -205,7 +204,7 @@ pub fn install() -> io::Result<()> {
         Err(_) => print_status(Status::Bad),
     }
     execute!(stdout(), Print("\nКопирование программы...."))?;
-    match fs::copy(&args[0], EXECUTABLE_PATH) {
+    match fs::copy(executable_path, INSTALL_EXECUTABLE_PATH) {
         Ok(_) => print_status(Status::Ok),
         Err(_) => print_status(Status::Bad),
     }
@@ -221,7 +220,11 @@ pub fn install() -> io::Result<()> {
                 key.set_value("", &Data::String("Переименовать УП".parse().unwrap())),
                 key.set_value(
                     "Icon",
-                    &Data::String(format!("\"{}\",2", EXECUTABLE_PATH).parse().unwrap()),
+                    &Data::String(
+                        format!("\"{}\",2", INSTALL_EXECUTABLE_PATH)
+                            .parse()
+                            .unwrap(),
+                    ),
                 ),
             ) {
                 (Ok(_), Ok(_)) => {
@@ -234,7 +237,9 @@ pub fn install() -> io::Result<()> {
                                 .set_value(
                                     "",
                                     &Data::String(
-                                        format!("\"{}\" \"%1\"", EXECUTABLE_PATH).parse().unwrap(),
+                                        format!("\"{}\" \"%1\"", INSTALL_EXECUTABLE_PATH)
+                                            .parse()
+                                            .unwrap(),
                                     ),
                                 )
                                 .is_ok()
@@ -258,15 +263,13 @@ pub fn install() -> io::Result<()> {
 
 pub fn uninstall() -> io::Result<()> {
     clearscreen::clear().unwrap();
-
     execute!(stdout(), Print("Удаление из контекстного меню..."))?;
     match Hive::ClassesRoot.delete(REG_BASE_PATH, true) {
         Ok(_) => print_status(Status::Ok),
         Err(_) => print_status(Status::Bad),
     }
-
     execute!(stdout(), Print("\nУдаление файла.................."))?;
-    match fs::remove_file(EXECUTABLE_PATH) {
+    match fs::remove_file(INSTALL_EXECUTABLE_PATH) {
         Ok(_) => print_status(Status::Ok),
         Err(_) => print_status(Status::Bad),
     }
