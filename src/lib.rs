@@ -22,10 +22,10 @@ enum Status {
     Bad,
 }
 
-const INSTALL_PATH: &str = r"C:\ProgramData\dece1ver\nc_renamer";
-const EXECUTABLE_PATH: &str = r"C:\ProgramData\dece1ver\nc_renamer\nc_renamer.exe";
-const REG_BASE_PATH: &str = r"*\shell\nc_renamer";
-const REG_COMMAND_PATH: &str = r"*\shell\nc_renamer\command";
+const INSTALL_PATH: &str = r"C:\ProgramData\dece1ver\cnc_renamer";
+const EXECUTABLE_PATH: &str = r"C:\ProgramData\dece1ver\cnc_renamer\cncr.exe";
+const REG_BASE_PATH: &str = r"*\shell\cnc_renamer";
+const REG_COMMAND_PATH: &str = r"*\shell\cnc_renamer\command";
 
 pub fn pause() {
     execute!(stdout(), Print("Нажмите любую клавишу для продолжения..."),).unwrap();
@@ -101,7 +101,7 @@ pub fn wait_command() -> Command {
             SetForegroundColor(Color::Yellow),
             Print("\n[1]"),
             ResetColor,
-            Print(" Установить NC Renamer и добавить в контекстное меню."),
+            Print(" Установить CNC Renamer и добавить в контекстное меню."),
         )
         .unwrap();
     } else if !is_elevated() && !is_installed() {
@@ -110,7 +110,7 @@ pub fn wait_command() -> Command {
             SetForegroundColor(Color::Yellow),
             Print("\n[1]"),
             ResetColor,
-            Print(" Установить NC Renamer и добавить в контекстное меню. "),
+            Print(" Установить CNC Renamer и добавить в контекстное меню. "),
             SetForegroundColor(Color::Red),
             Print("(недоступно)"),
             ResetColor
@@ -122,7 +122,7 @@ pub fn wait_command() -> Command {
             SetForegroundColor(Color::Yellow),
             Print("\n[1]"),
             ResetColor,
-            Print(" Удалить NC Renamer и убрать из контекстного меню."),
+            Print(" Удалить CNC Renamer и убрать из контекстного меню."),
         )
         .unwrap();
     } else {
@@ -131,7 +131,7 @@ pub fn wait_command() -> Command {
             SetForegroundColor(Color::Yellow),
             Print("\n[1]"),
             ResetColor,
-            Print(" Удалить NC Renamer и убрать из контекстного меню. "),
+            Print(" Удалить CNC Renamer и убрать из контекстного меню. "),
             SetForegroundColor(Color::Red),
             Print("(недоступно)"),
             ResetColor
@@ -242,14 +242,10 @@ pub fn install() -> io::Result<()> {
                                 print_status(Status::Ok);
                             }
                         }
-                        Err(_) => {
-                            print_status(Status::Bad);
-                        }
+                        Err(_) => print_status(Status::Bad),
                     }
                 }
-                _ => {
-                    print_status(Status::Bad);
-                }
+                _ => print_status(Status::Bad),
             }
         }
         Err(_) => {
