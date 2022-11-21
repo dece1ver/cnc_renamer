@@ -32,14 +32,15 @@ fn get_fanuc_name(file_path: &String) -> Option<String> {
         let mut index = 0;
         for line in lines.take(2) {
             if let Ok(line) = line {
-                if index == 0 && line.starts_with('<') {
-                    let name = line.split('<').nth(1).unwrap().split('>').nth(0).unwrap();
-                    println!("Fanuc 0i-TF");
-                    return Some(remove_bad_symbols(name));
-                } else if index == 0 && line.starts_with('%') {
+                if index == 0 && line.starts_with('%') {
                     index += 1;
-                    println!("Fanuc 0i");
+                    print!("Fanuc ");
+                } else if index == 1 && line.starts_with('<') {
+                    let name = line.split('<').nth(1).unwrap().split('>').nth(0).unwrap();
+                    println!("0i-TF");
+                    return Some(remove_bad_symbols(name));
                 } else if index == 1 && line.starts_with('O') {
+                    println!("0i");
                     let name = line.split('(').nth(1).unwrap().split(')').nth(0).unwrap();
                     return Some(remove_bad_symbols(name));
                 } else {

@@ -10,7 +10,7 @@ use is_elevated::is_elevated;
 use registry::{Data, Hive, Security};
 use std::io::stdout;
 use std::path::Path;
-use std::{fs, io};
+use std::{env, fs, io};
 
 pub enum Command {
     Install,
@@ -28,6 +28,7 @@ const INSTALL_PATH: &str = r"C:\ProgramData\dece1ver\cnc_renamer";
 const INSTALL_EXECUTABLE_PATH: &str = r"C:\ProgramData\dece1ver\cnc_renamer\cncr.exe";
 const REG_BASE_PATH: &str = r"*\shell\cnc_renamer";
 const REG_COMMAND_PATH: &str = r"*\shell\cnc_renamer\command";
+const REG_SYSTEM_ENV_PATH: &str = r"SYSTEM\CurrentControlSet\Control\Session Manager\Environment";
 
 pub fn pause() {
     execute!(stdout(), Print("Нажмите любую клавишу для продолжения..."),).unwrap();
@@ -192,6 +193,7 @@ pub fn wait_command() -> Command {
 pub fn show_about() {
     clearscreen::clear().unwrap();
     print!("{}", include_str!("../res/about"));
+    println!("{}", env::var("PATH").unwrap());
     return_back()
 }
 
@@ -203,6 +205,7 @@ pub fn install(executable_path: &String) -> io::Result<()> {
         Ok(_) => print_status(Status::Ok),
         Err(_) => print_status(Status::Bad),
     }
+
     execute!(stdout(), Print("\nКопирование программы...."))?;
     match fs::copy(executable_path, INSTALL_EXECUTABLE_PATH) {
         Ok(_) => print_status(Status::Ok),
@@ -257,6 +260,24 @@ pub fn install(executable_path: &String) -> io::Result<()> {
             print_status(Status::Bad);
         }
     }
+
+    execute!(stdout(), Print("\nУстановка в PATH........."))?;
+    let key = Hive::LocalMachine.open(REG_SYSTEM_ENV_PATH, Security::AllAccess);
+    match key {
+        Ok(key) => {
+            if let Ok(path) = key.value("Path") {
+                let new_path = Data::String(format!("{};{}", path, INSTALL_PATH).parse().unwrap());
+                if let Ok(_) = key.set_value("Path", &new_path) {
+                    print_status(Status::Ok);
+                }
+            }
+        }
+        Err(e) => {
+            print_status(Status::Bad);
+            println!("{:#?}", e)
+        }
+    }
+
     return_back();
     Ok(())
 }
@@ -272,6 +293,27 @@ pub fn uninstall() -> io::Result<()> {
     match fs::remove_file(INSTALL_EXECUTABLE_PATH) {
         Ok(_) => print_status(Status::Ok),
         Err(_) => print_status(Status::Bad),
+    }
+    execute!(stdout(), Print("\nУдаление из PATH................"))?;
+    let key = Hive::LocalMachine.open(REG_SYSTEM_ENV_PATH, Security::AllAccess);
+    match key {
+        Ok(key) => {
+            if let Ok(path) = key.value("Path") {
+                let new_path = Data::String(
+                    path.to_string()
+                        .replace(format!(";{}", INSTALL_PATH).as_str(), "")
+                        .parse()
+                        .unwrap(),
+                );
+                if let Ok(_) = key.set_value("Path", &new_path) {
+                    print_status(Status::Ok);
+                }
+            }
+        }
+        Err(e) => {
+            print_status(Status::Bad);
+            println!("{:#?}", e)
+        }
     }
     return_back();
     Ok(())
