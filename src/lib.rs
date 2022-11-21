@@ -1,4 +1,4 @@
-mod reader;
+pub mod reader;
 
 use crossterm::{
     event::{read, Event, KeyCode},
@@ -7,6 +7,7 @@ use crossterm::{
     terminal::disable_raw_mode,
 };
 use is_elevated::is_elevated;
+
 use registry::{Data, Hive, Security};
 use std::io::stdout;
 use std::path::Path;
@@ -64,9 +65,24 @@ fn return_back() {
 fn is_installed() -> bool {
     if !Path::new(INSTALL_EXECUTABLE_PATH).exists() {
         return false;
-    } else {
-        if let Err(_) = Hive::ClassesRoot.open(REG_BASE_PATH, Security::Read) {
-            return false;
+    }
+    if Hive::ClassesRoot
+        .open(REG_BASE_PATH, Security::Read)
+        .is_err()
+    {
+        return false;
+    }
+    if Hive::ClassesRoot
+        .open(REG_COMMAND_PATH, Security::Read)
+        .is_err()
+    {
+        return false;
+    }
+    if let Ok(key) = Hive::ClassesRoot.open(REG_SYSTEM_ENV_PATH, Security::Read) {
+        if let Ok(path) = key.value("Path") {
+            if !path.to_string().contains(INSTALL_PATH) {
+                return false;
+            }
         }
     }
     true
@@ -267,8 +283,10 @@ pub fn install(executable_path: &String) -> io::Result<()> {
         Ok(key) => {
             if let Ok(path) = key.value("Path") {
                 let new_path = Data::String(format!("{};{}", path, INSTALL_PATH).parse().unwrap());
-                if let Ok(_) = key.set_value("Path", &new_path) {
+                if key.set_value("Path", &new_path).is_ok() {
                     print_status(Status::Ok);
+                } else {
+                    print_status(Status::Bad);
                 }
             }
         }
@@ -305,8 +323,9 @@ pub fn uninstall() -> io::Result<()> {
                         .parse()
                         .unwrap(),
                 );
-                if let Ok(_) = key.set_value("Path", &new_path) {
-                    print_status(Status::Ok);
+                match key.set_value("Path", &new_path) {
+                    Ok(_) => print_status(Status::Ok),
+                    Err(_) => print_status(Status::Bad),
                 }
             }
         }

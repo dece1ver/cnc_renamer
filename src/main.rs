@@ -35,7 +35,7 @@ fn main() -> Result<()> {
         _ => {
             for arg in args.iter().skip(1) {
                 println!("{}", arg);
-                if let Some(name) = reader::get_cnc_name(&arg) {
+                if let Some(name) = reader::get_cnc_name(arg) {
                     println!("{}", name);
                 }
             }
