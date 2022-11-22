@@ -11,7 +11,7 @@ use is_elevated::is_elevated;
 use registry::{Data, Hive, Security};
 use std::io::stdout;
 use std::path::Path;
-use std::{env, fs, io};
+use std::{fs, io};
 
 pub enum Command {
     Install,
@@ -32,7 +32,11 @@ const REG_COMMAND_PATH: &str = r"*\shell\cnc_renamer\command";
 const REG_SYSTEM_ENV_PATH: &str = r"SYSTEM\CurrentControlSet\Control\Session Manager\Environment";
 
 pub fn pause() {
-    execute!(stdout(), Print("Нажмите любую клавишу для продолжения..."),).unwrap();
+    execute!(
+        stdout(),
+        Print("\n\nНажмите любую клавишу для продолжения..."),
+    )
+    .unwrap();
     loop {
         if let Event::Key(_) = read().unwrap() {
             break;
@@ -209,7 +213,6 @@ pub fn wait_command() -> Command {
 pub fn show_about() {
     clearscreen::clear().unwrap();
     print!("{}", include_str!("../res/about"));
-    println!("{}", env::var("PATH").unwrap());
     return_back()
 }
 
@@ -296,7 +299,7 @@ pub fn install(executable_path: &String) -> io::Result<()> {
         }
     }
 
-    return_back();
+    pause();
     Ok(())
 }
 
@@ -334,7 +337,7 @@ pub fn uninstall() -> io::Result<()> {
             println!("{:#?}", e)
         }
     }
-    return_back();
+    pause();
     Ok(())
 }
 

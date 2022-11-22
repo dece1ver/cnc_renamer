@@ -1,10 +1,10 @@
 use std::ffi::OsStr;
 use std::fs::File;
-use std::io;
-use std::io::BufRead;
+use std::io::{BufRead, Read};
 use std::path::Path;
+use std::{io};
 
-const NAMELESS: &str = "Без названия";
+const _NAMELESS: &str = "Без названия";
 const MAZATROL_EXTENSIONS: [&str; 2] = ["pbg", "pbd"];
 const HEIDENHAIN_EXTENSIONS: [&str; 1] = ["h"];
 const SINUMERIK_EXTENSIONS: [&str; 2] = ["mpf", "spf"];
@@ -27,23 +27,14 @@ pub fn get_cnc_name(file_path: &str) -> Option<String> {
     }
 }
 
-fn get_extension(filename: &str) -> Option<&str> {
-    Path::new(filename).extension().and_then(OsStr::to_str)
-}
-
 fn get_fanuc_name(file_path: &str) -> Option<String> {
     if let Ok(lines) = read_lines(file_path) {
-        let mut index = 0;
-        for line in lines.take(2).flatten() {
-            if index == 0 && line.starts_with('%') {
-                index += 1;
-                print!("Fanuc ");
-            } else if index == 1 && line.starts_with('<') {
+        for (i, line) in lines.take(2).flatten().enumerate() {
+            if i == 0 && line.starts_with('%') {
+            } else if i == 1 && line.starts_with('<') {
                 let name = line.split('<').nth(1).unwrap().split('>').next().unwrap();
-                println!("0i-TF");
                 return Some(remove_bad_symbols(name));
-            } else if index == 1 && line.starts_with('O') {
-                println!("0i");
+            } else if i == 1 && line.starts_with('O') {
                 let name = line.split('(').nth(1).unwrap().split(')').next().unwrap();
                 return Some(remove_bad_symbols(name));
             } else {
@@ -56,21 +47,36 @@ fn get_fanuc_name(file_path: &str) -> Option<String> {
 
 fn get_mazatrol_name(file_path: &str) -> Option<String> {
     println!("Mazatrol");
-    // так не читает
-    if let Ok(mut lines) = read_lines(file_path) {
-        if let Some(Ok(name)) = lines.nth(1) {
-            return Some(remove_bad_symbols(name.trim().trim_matches('\0')));
+    if let Ok(mut f) = File::open(file_path) {
+        let mut buffer = Vec::new();
+        if f.read_to_end(&mut buffer).is_ok() {
+            let text = String::from_utf8_lossy(buffer.as_ref());
+            return Some(remove_bad_symbols(text.trim()[80..132].trim_matches('\0')));
         }
     }
     None
 }
 
-fn get_sinumerik_name(_file_path: &str) -> Option<String> {
-    todo!()
+fn get_sinumerik_name(file_path: &str) -> Option<String> {
+    if let Ok(lines) = read_lines(file_path) {
+        if let Some(line)= lines.flatten().next() {
+            return if line.starts_with("MSG") && line.contains('(') && line.contains(')') {
+                let name = line.split('(').nth(1).unwrap().split(')').next().unwrap();
+                Some(remove_bad_symbols(name))
+            } else {
+                None
+            };
+        }
+    }
+    None
 }
 
 fn get_heidenhain_name(_file_path: &str) -> Option<String> {
     todo!()
+}
+
+fn get_extension(filename: &str) -> Option<&str> {
+    Path::new(filename).extension().and_then(OsStr::to_str)
 }
 
 fn read_lines<P>(filename: P) -> io::Result<io::Lines<io::BufReader<File>>>
