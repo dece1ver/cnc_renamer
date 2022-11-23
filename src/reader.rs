@@ -1,8 +1,8 @@
 use std::ffi::OsStr;
 use std::fs::File;
+use std::io;
 use std::io::{BufRead, Read};
 use std::path::Path;
-use std::{io};
 
 const _NAMELESS: &str = "Без названия";
 const MAZATROL_EXTENSIONS: [&str; 2] = ["pbg", "pbd"];
@@ -50,8 +50,15 @@ fn get_mazatrol_name(file_path: &str) -> Option<String> {
     if let Ok(mut f) = File::open(file_path) {
         let mut buffer = Vec::new();
         if f.read_to_end(&mut buffer).is_ok() {
-            let text = String::from_utf8_lossy(buffer.as_ref());
-            return Some(remove_bad_symbols(text.trim()[80..132].trim_matches('\0')));
+            let mut name = String::new();
+            for char in String::from_utf8_lossy(buffer.as_ref())
+                .chars()
+                .skip(80)
+                .take(32)
+            {
+                name.push(char)
+            }
+            return Some(remove_bad_symbols(name.trim().trim_matches('\0')));
         }
     }
     None
@@ -59,20 +66,34 @@ fn get_mazatrol_name(file_path: &str) -> Option<String> {
 
 fn get_sinumerik_name(file_path: &str) -> Option<String> {
     if let Ok(lines) = read_lines(file_path) {
-        if let Some(line)= lines.flatten().next() {
-            return if line.starts_with("MSG") && line.contains('(') && line.contains(')') {
-                let name = line.split('(').nth(1).unwrap().split(')').next().unwrap();
-                Some(remove_bad_symbols(name))
+        if let Some(line) = lines.flatten().next() {
+            if line.starts_with("MSG") && line.contains('(') && line.contains(')') {
+                if let Some(name) = line.split('(').nth(1) {
+                    if let Some(name) = name.split(')').next() {
+                        return Some(remove_bad_symbols(name));
+                    }
+                }
+            }
+        }
+    }
+    None
+}
+
+fn get_heidenhain_name(file_path: &str) -> Option<String> {
+    if let Ok(lines) = read_lines(file_path) {
+        if let Some(line) = lines.take(1).flatten().next() {
+            return if line.starts_with("BEGIN PGM") {
+                Some(remove_bad_symbols(
+                    line.replace("BEGIN PGM ", "")
+                        .trim_start_matches('0')
+                        .trim(),
+                ))
             } else {
                 None
             };
         }
     }
     None
-}
-
-fn get_heidenhain_name(_file_path: &str) -> Option<String> {
-    todo!()
 }
 
 fn get_extension(filename: &str) -> Option<&str> {

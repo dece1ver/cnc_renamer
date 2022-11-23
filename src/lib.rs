@@ -219,24 +219,24 @@ pub fn show_about() {
 pub fn install(executable_path: &String) -> io::Result<()> {
     clearscreen::clear().unwrap();
 
-    execute!(stdout(), Print("Создание директории......"))?;
+    execute!(stdout(), Print("Создание директории.................."))?;
     match fs::create_dir_all(INSTALL_PATH) {
         Ok(_) => print_status(Status::Ok),
         Err(_) => print_status(Status::Bad),
     }
 
-    execute!(stdout(), Print("\nКопирование программы...."))?;
+    execute!(stdout(), Print("\nКопирование программы................"))?;
     match fs::copy(executable_path, INSTALL_EXECUTABLE_PATH) {
         Ok(_) => print_status(Status::Ok),
         Err(_) => print_status(Status::Bad),
     }
 
-    execute!(stdout(), Print("\nСоздание ключа реестра..."))?;
+    execute!(stdout(), Print("\nСоздание ключа реестра..............."))?;
     let key = Hive::ClassesRoot.create(REG_BASE_PATH, Security::Write);
     match key {
         Ok(key) => {
             print_status(Status::Ok);
-            execute!(stdout(), Print("\nВнесение параметров......"))?;
+            execute!(stdout(), Print("\nВнесение параметров.................."))?;
 
             match (
                 key.set_value("", &Data::String("Переименовать УП".parse().unwrap())),
@@ -251,7 +251,7 @@ pub fn install(executable_path: &String) -> io::Result<()> {
             ) {
                 (Ok(_), Ok(_)) => {
                     print_status(Status::Ok);
-                    execute!(stdout(), Print("\nУстановка команды........"))?;
+                    execute!(stdout(), Print("\nУстановка команды...................."))?;
                     let key = Hive::ClassesRoot.create(REG_COMMAND_PATH, Security::Write);
                     match key {
                         Ok(key) => {
@@ -280,7 +280,7 @@ pub fn install(executable_path: &String) -> io::Result<()> {
         }
     }
 
-    execute!(stdout(), Print("\nУстановка в PATH........."))?;
+    execute!(stdout(), Print("\nУстановка в PATH....................."))?;
     let key = Hive::LocalMachine.open(REG_SYSTEM_ENV_PATH, Security::AllAccess);
     match key {
         Ok(key) => {
@@ -305,17 +305,17 @@ pub fn install(executable_path: &String) -> io::Result<()> {
 
 pub fn uninstall() -> io::Result<()> {
     clearscreen::clear().unwrap();
-    execute!(stdout(), Print("Удаление из контекстного меню..."))?;
+    execute!(stdout(), Print("Удаление из контекстного меню........"))?;
     match Hive::ClassesRoot.delete(REG_BASE_PATH, true) {
         Ok(_) => print_status(Status::Ok),
         Err(_) => print_status(Status::Bad),
     }
-    execute!(stdout(), Print("\nУдаление файла.................."))?;
+    execute!(stdout(), Print("\nУдаление файла......................."))?;
     match fs::remove_file(INSTALL_EXECUTABLE_PATH) {
         Ok(_) => print_status(Status::Ok),
         Err(_) => print_status(Status::Bad),
     }
-    execute!(stdout(), Print("\nУдаление из PATH................"))?;
+    execute!(stdout(), Print("\nУдаление из PATH....................."))?;
     let key = Hive::LocalMachine.open(REG_SYSTEM_ENV_PATH, Security::AllAccess);
     match key {
         Ok(key) => {
