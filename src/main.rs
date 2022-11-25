@@ -1,12 +1,15 @@
-use cnc_renamer::{install, pause, show_about, uninstall, wait_command, Command};
+use cnc_renamer::{
+    install, pause, print_status, show_about, uninstall, wait_command, Command, Status,
+};
 use crossterm::{
     cursor::{Hide, Show},
     execute,
     terminal::{Clear, ClearType, SetTitle},
     Result,
 };
-use std::env;
 use std::io::stdout;
+use std::path::Path;
+use std::{env, fs};
 
 mod reader;
 
@@ -34,12 +37,18 @@ fn main() -> Result<()> {
         }
         _ => {
             for arg in args.iter().skip(1) {
-                println!("{}", arg);
                 if let Some(name) = reader::get_cnc_name(arg) {
-                    println!("{}", name);
+                    let old_name = Path::new(arg);
+                    if let Some(dir) = old_name.parent() {
+                        let new_name = dir.join(name);
+                        if fs::rename(old_name, new_name).is_ok() {
+                            print_status(Status::Ok)
+                        } else {
+                            print_status(Status::Bad)
+                        }
+                    }
                 }
             }
-            pause()
         }
     }
 

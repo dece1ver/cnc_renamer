@@ -15,11 +15,11 @@ pub fn get_cnc_name(file_path: &str) -> Option<String> {
         None => get_fanuc_name(file_path),
         Some(ext) => {
             if MAZATROL_EXTENSIONS.contains(&ext.to_lowercase().as_str()) {
-                get_mazatrol_name(file_path)
+                get_mazatrol_name(file_path, ext)
             } else if HEIDENHAIN_EXTENSIONS.contains(&ext.to_lowercase().as_str()) {
-                get_heidenhain_name(file_path)
+                get_heidenhain_name(file_path, ext)
             } else if SINUMERIK_EXTENSIONS.contains(&ext.to_lowercase().as_str()) {
-                get_sinumerik_name(file_path)
+                get_sinumerik_name(file_path, ext)
             } else {
                 get_fanuc_name(file_path)
             }
@@ -45,7 +45,7 @@ fn get_fanuc_name(file_path: &str) -> Option<String> {
     None
 }
 
-fn get_mazatrol_name(file_path: &str) -> Option<String> {
+fn get_mazatrol_name(file_path: &str, extension: &str) -> Option<String> {
     println!("Mazatrol");
     if let Ok(mut f) = File::open(file_path) {
         let mut buffer = Vec::new();
@@ -58,19 +58,23 @@ fn get_mazatrol_name(file_path: &str) -> Option<String> {
             {
                 name.push(char)
             }
-            return Some(remove_bad_symbols(name.trim().trim_matches('\0')));
+            return Some(format!(
+                "{}.{}",
+                remove_bad_symbols(name.trim().trim_matches('\0')),
+                extension
+            ));
         }
     }
     None
 }
 
-fn get_sinumerik_name(file_path: &str) -> Option<String> {
+fn get_sinumerik_name(file_path: &str, extension: &str) -> Option<String> {
     if let Ok(lines) = read_lines(file_path) {
         if let Some(line) = lines.flatten().next() {
             if line.starts_with("MSG") && line.contains('(') && line.contains(')') {
                 if let Some(name) = line.split('(').nth(1) {
                     if let Some(name) = name.split(')').next() {
-                        return Some(remove_bad_symbols(name));
+                        return Some(format!("{}.{}", remove_bad_symbols(name), extension));
                     }
                 }
             }
@@ -79,14 +83,18 @@ fn get_sinumerik_name(file_path: &str) -> Option<String> {
     None
 }
 
-fn get_heidenhain_name(file_path: &str) -> Option<String> {
+fn get_heidenhain_name(file_path: &str, extension: &str) -> Option<String> {
     if let Ok(lines) = read_lines(file_path) {
         if let Some(line) = lines.take(1).flatten().next() {
             return if line.starts_with("BEGIN PGM") {
-                Some(remove_bad_symbols(
-                    line.replace("BEGIN PGM ", "")
-                        .trim_start_matches('0')
-                        .trim(),
+                Some(format!(
+                    "{}.{}",
+                    remove_bad_symbols(
+                        line.replace("BEGIN PGM ", "")
+                            .trim_start_matches('0')
+                            .trim(),
+                    ),
+                    extension
                 ))
             } else {
                 None

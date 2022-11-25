@@ -20,7 +20,7 @@ pub enum Command {
     Exit,
 }
 
-enum Status {
+pub enum Status {
     Ok,
     Bad,
 }
@@ -341,7 +341,7 @@ pub fn uninstall() -> io::Result<()> {
     Ok(())
 }
 
-fn print_status(status: Status) {
+pub fn print_status(status: Status) {
     match status {
         Status::Ok => {
             execute!(
