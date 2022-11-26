@@ -1,6 +1,4 @@
-use cnc_renamer::{
-    install, pause, print_status, show_about, uninstall, wait_command, Command, Status,
-};
+use cnc_renamer::{install, print_status, show_about, uninstall, wait_command, Command, Status};
 use crossterm::{
     cursor::{Hide, Show},
     execute,
@@ -37,10 +35,26 @@ fn main() -> Result<()> {
         }
         _ => {
             for arg in args.iter().skip(1) {
-                if let Some(name) = reader::get_cnc_name(arg) {
+                if let Some((name, ext)) = reader::get_cnc_name(arg) {
+                    println!("Найдена программа ЧПУ: {}", name);
                     let old_name = Path::new(arg);
+                    println!("Изначальный файл: {:#?}", old_name);
                     if let Some(dir) = old_name.parent() {
-                        let new_name = dir.join(name);
+                        let mut new_name = dir.join(format!("{}.{}", name, ext));
+                        if new_name == old_name {
+                            break;
+                        };
+                        println!("Новый файл: {:#?}", new_name);
+                        let mut copy: u32 = 0;
+                        while new_name.exists() {
+                            if new_name == old_name {
+                                break;
+                            };
+                            copy += 1;
+                            println!("Новый файл уже существует...{}", copy);
+                            new_name = dir.join(format!("{} ({}).{}", name, copy, ext));
+                        }
+                        println!("Переименовывание...{}", copy);
                         if fs::rename(old_name, new_name).is_ok() {
                             print_status(Status::Ok)
                         } else {
