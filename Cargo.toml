@@ -8,8 +8,6 @@ build = "src/build.rs"
 name = "cncr"
 path = "src/main.rs"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [package.metadata.winres]
 ProductName = "CNC Renamer"
 FileDescription = "CNC Renamer"

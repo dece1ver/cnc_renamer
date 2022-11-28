@@ -11,6 +11,7 @@ use is_elevated::is_elevated;
 use registry::{Data, Hive, Security};
 use std::io::stdout;
 use std::path::Path;
+use std::string::ToString;
 use std::{fs, io};
 
 pub enum Command {
@@ -25,8 +26,8 @@ pub enum Status {
     Bad,
 }
 
-const INSTALL_PATH: &str = r"C:\ProgramData\dece1ver\cnc_renamer";
-const INSTALL_EXECUTABLE_PATH: &str = r"C:\ProgramData\dece1ver\cnc_renamer\cncr.exe";
+const INSTALL_PATH: &str = r"C:\Program Files\dece1ver\CNC Renamer";
+const INSTALL_EXECUTABLE_PATH: &str = r"C:\Program Files\dece1ver\CNC Renamer\cncr.exe";
 const REG_BASE_PATH: &str = r"*\shell\cnc_renamer";
 const REG_COMMAND_PATH: &str = r"*\shell\cnc_renamer\command";
 const REG_SYSTEM_ENV_PATH: &str = r"SYSTEM\CurrentControlSet\Control\Session Manager\Environment";

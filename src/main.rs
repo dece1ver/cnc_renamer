@@ -35,12 +35,16 @@ fn main() -> Result<()> {
         }
         _ => {
             for arg in args.iter().skip(1) {
+                println!("Аргумент: {}", arg);
                 if let Some((name, ext)) = reader::get_cnc_name(arg) {
                     println!("Найдена программа ЧПУ: {}", name);
                     let old_name = Path::new(arg);
-                    println!("Изначальный файл: {:#?}", old_name);
+
                     if let Some(dir) = old_name.parent() {
-                        let mut new_name = dir.join(format!("{}.{}", name, ext));
+                        let mut new_name = match ext.len() {
+                            0 => dir.join(&name),
+                            _ => dir.join(format!("{}.{}", name, ext)),
+                        };
                         if new_name == old_name {
                             break;
                         };
@@ -51,10 +55,13 @@ fn main() -> Result<()> {
                                 break;
                             };
                             copy += 1;
-                            println!("Новый файл уже существует...{}", copy);
-                            new_name = dir.join(format!("{} ({}).{}", name, copy, ext));
+                            new_name = match ext.len() {
+                                0 => dir.join(format!("{} ({})", name, copy)),
+                                _ => dir.join(format!("{} ({}).{}", name, copy, ext)),
+                            };
+                            println!("Новый файл уже существует...\nПроверка {:?}", new_name);
                         }
-                        println!("Переименовывание...{}", copy);
+                        print!("Переименовывание...");
                         if fs::rename(old_name, new_name).is_ok() {
                             print_status(Status::Ok)
                         } else {
