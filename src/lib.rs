@@ -68,19 +68,13 @@ fn return_back() {
 }
 
 fn is_installed() -> bool {
-    if !Path::new(INSTALL_EXECUTABLE_PATH).exists() {
-        return false;
-    }
-    if Hive::ClassesRoot
+    if !Path::new(INSTALL_EXECUTABLE_PATH).exists()
+    || Hive::ClassesRoot
         .open(REG_BASE_PATH, Security::Read)
-        .is_err()
-    {
-        return false;
-    }
-    if Hive::ClassesRoot
+        .is_err() 
+    || Hive::ClassesRoot
         .open(REG_COMMAND_PATH, Security::Read)
-        .is_err()
-    {
+        .is_err() {
         return false;
     }
     if let Ok(key) = Hive::ClassesRoot.open(REG_SYSTEM_ENV_PATH, Security::Read) {

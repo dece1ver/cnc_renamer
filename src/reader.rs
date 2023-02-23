@@ -73,7 +73,7 @@ fn get_sinumerik_name<'a>(file_path: &str, extension: &'a str) -> Option<(String
             if line.starts_with("MSG") && line.contains('(') && line.contains(')') {
                 if let Some(name) = line.split('(').nth(1) {
                     if let Some(name) = name.split(')').next() {
-                        return Some((remove_bad_symbols(name), extension));
+                        return Some((remove_bad_symbols(name.trim_matches('"')), extension));
                     }
                 }
             }
