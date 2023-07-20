@@ -1,8 +1,10 @@
 use std::ffi::OsStr;
-use std::fs::File;
+use std::fs::{self, File};
 use std::io;
 use std::io::{BufRead, Read};
 use std::path::Path;
+
+use crate::{print_status, Status};
 
 const _NAMELESS: &str = "Без названия";
 const MAZATROL_EXTENSIONS: [&str; 2] = ["pbg", "pbd"];
@@ -31,12 +33,19 @@ fn get_fanuc_name(file_path: &str) -> Option<(String, &str)> {
     if let Ok(lines) = read_lines(file_path) {
         for (i, line) in lines.take(2).flatten().enumerate() {
             if i == 0 && line.starts_with('%') {
+                continue;
             } else if i == 1 && line.starts_with('<') {
-                let name = line.split('<').nth(1).unwrap().split('>').next().unwrap();
-                return Some((remove_bad_symbols(name), ""));
+                return line.split('<').nth(1).and_then(|name| {
+                    name.split('>')
+                        .next()
+                        .map(|name| (remove_bad_symbols(name), ""))
+                });
             } else if i == 1 && line.starts_with('O') {
-                let name = line.split('(').nth(1).unwrap().split(')').next().unwrap();
-                return Some((remove_bad_symbols(name), ""));
+                return line.split('(').nth(1).and_then(|name| {
+                    name.split(')')
+                        .next()
+                        .map(|name| (remove_bad_symbols(name), ""))
+                });
             } else {
                 return None;
             }
@@ -120,4 +129,42 @@ fn remove_bad_symbols(text: &str) -> String {
         text = text.replace(bad_symbol, "-");
     }
     text
+}
+
+pub fn try_rename(file_path: &str) {
+    if let Some((name, ext)) = get_cnc_name(file_path) {
+        println!("    Найдена программа ЧПУ: {}", name);
+        let old_name = Path::new(file_path);
+
+        if let Some(dir) = old_name.parent() {
+            let mut new_name = match ext.len() {
+                0 => dir.join(&name),
+                _ => dir.join(format!("{}.{}", name, ext)),
+            };
+            if new_name == old_name {
+                println!("    Переименовывание не требуется.");
+                return;
+            };
+            println!("    Новое имя: {:#?}", new_name);
+            let mut copy: u32 = 0;
+            while new_name.exists() {
+                if new_name == old_name {
+                    break;
+                };
+                copy += 1;
+                new_name = match ext.len() {
+                    0 => dir.join(format!("{} ({})", name, copy)),
+                    _ => dir.join(format!("{} ({}).{}", name, copy, ext)),
+                };
+                println!("    Новый файл уже существует...\n    Проверка {:?}", new_name);
+            }
+            print!("    Переименовывание...");
+            if fs::rename(old_name, new_name).is_ok() {
+                print_status(Status::Ok);
+            } else {
+                print_status(Status::Bad);
+            }
+        }
+    }
+    println!("\n")
 }

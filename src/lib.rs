@@ -28,8 +28,12 @@ pub enum Status {
 
 const INSTALL_PATH: &str = r"C:\Program Files\dece1ver\CNC Renamer";
 const INSTALL_EXECUTABLE_PATH: &str = r"C:\Program Files\dece1ver\CNC Renamer\cncr.exe";
-const REG_BASE_PATH: &str = r"*\shell\cnc_renamer";
-const REG_COMMAND_PATH: &str = r"*\shell\cnc_renamer\command";
+const REG_FILE_PATH: &str = r"*\shell\cnc_renamer";
+const REG_DIR_PATH: &str = r"Directory\shell\cnc_renamer";
+const REG_BGDIR_PATH: &str = r"Directory\Background\shell\cnc_renamer";
+const REG_FILE_COMMAND_PATH: &str = r"*\shell\cnc_renamer\command";
+const REG_DIR_COMMAND_PATH: &str = r"Directory\shell\cnc_renamer\command";
+const REG_BGDIR_COMMAND_PATH: &str = r"Directory\Background\shell\cnc_renamer\command";
 const REG_SYSTEM_ENV_PATH: &str = r"SYSTEM\CurrentControlSet\Control\Session Manager\Environment";
 
 pub fn pause() {
@@ -69,12 +73,25 @@ fn return_back() {
 
 fn is_installed() -> bool {
     if !Path::new(INSTALL_EXECUTABLE_PATH).exists()
-    || Hive::ClassesRoot
-        .open(REG_BASE_PATH, Security::Read)
-        .is_err() 
-    || Hive::ClassesRoot
-        .open(REG_COMMAND_PATH, Security::Read)
-        .is_err() {
+        || Hive::ClassesRoot
+            .open(REG_FILE_PATH, Security::Read)
+            .is_err()
+        || Hive::ClassesRoot
+            .open(REG_DIR_PATH, Security::Read)
+            .is_err()
+        || Hive::ClassesRoot
+            .open(REG_BGDIR_PATH, Security::Read)
+            .is_err()
+        || Hive::ClassesRoot
+            .open(REG_FILE_COMMAND_PATH, Security::Read)
+            .is_err()
+        || Hive::ClassesRoot
+            .open(REG_DIR_COMMAND_PATH, Security::Read)
+            .is_err()
+        || Hive::ClassesRoot
+            .open(REG_BGDIR_COMMAND_PATH, Security::Read)
+            .is_err()
+    {
         return false;
     }
     if let Ok(key) = Hive::ClassesRoot.open(REG_SYSTEM_ENV_PATH, Security::Read) {
@@ -214,68 +231,52 @@ pub fn show_about() {
 pub fn install(executable_path: &String) -> io::Result<()> {
     clearscreen::clear().unwrap();
 
-    execute!(stdout(), Print("Создание директории.................."))?;
+    execute!(stdout(), Print("Создание директории....................."))?;
     match fs::create_dir_all(INSTALL_PATH) {
         Ok(_) => print_status(Status::Ok),
         Err(_) => print_status(Status::Bad),
     }
 
-    execute!(stdout(), Print("\nКопирование программы................"))?;
+    execute!(
+        stdout(),
+        Print("\nКопирование программы...................")
+    )?;
     match fs::copy(executable_path, INSTALL_EXECUTABLE_PATH) {
         Ok(_) => print_status(Status::Ok),
         Err(_) => print_status(Status::Bad),
     }
 
-    execute!(stdout(), Print("\nСоздание ключа реестра..............."))?;
-    let key = Hive::ClassesRoot.create(REG_BASE_PATH, Security::Write);
-    match key {
-        Ok(key) => {
-            print_status(Status::Ok);
-            execute!(stdout(), Print("\nВнесение параметров.................."))?;
+    execute!(
+        stdout(),
+        Print("\nСоздание ключа реестра для файлов.......")
+    )?;
+    match install_key(REG_FILE_PATH, REG_FILE_COMMAND_PATH, "%1") {
+        Ok(_) => print_status(Status::Ok),
+        Err(_) => print_status(Status::Bad),
+    };
 
-            match (
-                key.set_value("", &Data::String("Переименовать УП".parse().unwrap())),
-                key.set_value(
-                    "Icon",
-                    &Data::String(
-                        format!("\"{}\",2", INSTALL_EXECUTABLE_PATH)
-                            .parse()
-                            .unwrap(),
-                    ),
-                ),
-            ) {
-                (Ok(_), Ok(_)) => {
-                    print_status(Status::Ok);
-                    execute!(stdout(), Print("\nУстановка команды...................."))?;
-                    let key = Hive::ClassesRoot.create(REG_COMMAND_PATH, Security::Write);
-                    match key {
-                        Ok(key) => {
-                            if key
-                                .set_value(
-                                    "",
-                                    &Data::String(
-                                        format!("\"{}\" \"%1\"", INSTALL_EXECUTABLE_PATH)
-                                            .parse()
-                                            .unwrap(),
-                                    ),
-                                )
-                                .is_ok()
-                            {
-                                print_status(Status::Ok);
-                            }
-                        }
-                        Err(_) => print_status(Status::Bad),
-                    }
-                }
-                _ => print_status(Status::Bad),
-            }
-        }
-        Err(_) => {
-            print_status(Status::Bad);
-        }
-    }
+    execute!(
+        stdout(),
+        Print("\nСоздание ключа реестра для папок........")
+    )?;
+    match install_key(REG_DIR_PATH, REG_DIR_COMMAND_PATH, "%1") {
+        Ok(_) => print_status(Status::Ok),
+        Err(_) => print_status(Status::Bad),
+    };
 
-    execute!(stdout(), Print("\nУстановка в PATH....................."))?;
+    execute!(
+        stdout(),
+        Print("\nСоздание ключа реестра для папок (ф)....")
+    )?;
+    match install_key(REG_BGDIR_PATH, REG_BGDIR_COMMAND_PATH, "%V") {
+        Ok(_) => print_status(Status::Ok),
+        Err(_) => print_status(Status::Bad),
+    };
+
+    execute!(
+        stdout(),
+        Print("\nУстановка в PATH........................")
+    )?;
     let key = Hive::LocalMachine.open(REG_SYSTEM_ENV_PATH, Security::AllAccess);
     match key {
         Ok(key) => {
@@ -298,19 +299,86 @@ pub fn install(executable_path: &String) -> io::Result<()> {
     Ok(())
 }
 
+fn install_key(base_key: &str, command_key: &str, arg: &str) -> io::Result<()> {
+    let key = Hive::ClassesRoot.create(base_key, Security::Write);
+    if let Ok(key) = key {
+        if let (Ok(_), Ok(_)) = (
+            key.set_value("", &Data::String("Переименовать УП".parse().unwrap())),
+            key.set_value(
+                "Icon",
+                &Data::String(
+                    format!("\"{}\",2", INSTALL_EXECUTABLE_PATH)
+                        .parse()
+                        .unwrap(),
+                ),
+            ),
+        ) {
+            let key = Hive::ClassesRoot.create(command_key, Security::Write);
+            if let Ok(key) = key {
+                if let Err(err) = key.set_value(
+                    "",
+                    &Data::String(
+                        format!("\"{}\" \"{}\"", INSTALL_EXECUTABLE_PATH, arg)
+                            .parse()
+                            .unwrap(),
+                    ),
+                ) {
+                    return Err(io::Error::new(io::ErrorKind::Other, err.to_string()));
+                }
+            }
+        } else {
+            return Err(io::Error::new(
+                io::ErrorKind::Other,
+                "Ошибка создания ключа реестра.",
+            ));
+        }
+    } else {
+        return Err(io::Error::new(
+            io::ErrorKind::Other,
+            "Ошибка создания ключа реестра.",
+        ));
+    }
+    Ok(())
+}
+
 pub fn uninstall() -> io::Result<()> {
     clearscreen::clear().unwrap();
-    execute!(stdout(), Print("Удаление из контекстного меню........"))?;
-    match Hive::ClassesRoot.delete(REG_BASE_PATH, true) {
+    execute!(
+        stdout(),
+        Print("\nУдаление из контекстного меню файлов....")
+    )?;
+    match Hive::ClassesRoot.delete(REG_FILE_PATH, true) {
         Ok(_) => print_status(Status::Ok),
         Err(_) => print_status(Status::Bad),
     }
-    execute!(stdout(), Print("\nУдаление файла......................."))?;
+    execute!(
+        stdout(),
+        Print("\nУдаление из контекстного меню папок.....")
+    )?;
+    match Hive::ClassesRoot.delete(REG_DIR_PATH, true) {
+        Ok(_) => print_status(Status::Ok),
+        Err(_) => print_status(Status::Bad),
+    }
+    execute!(
+        stdout(),
+        Print("\nУдаление из контекстного меню папок (ф).")
+    )?;
+    match Hive::ClassesRoot.delete(REG_BGDIR_PATH, true) {
+        Ok(_) => print_status(Status::Ok),
+        Err(_) => print_status(Status::Bad),
+    }
+    execute!(
+        stdout(),
+        Print("\nУдаление файла..........................")
+    )?;
     match fs::remove_file(INSTALL_EXECUTABLE_PATH) {
         Ok(_) => print_status(Status::Ok),
         Err(_) => print_status(Status::Bad),
     }
-    execute!(stdout(), Print("\nУдаление из PATH....................."))?;
+    execute!(
+        stdout(),
+        Print("\nУдаление из PATH........................")
+    )?;
     let key = Hive::LocalMachine.open(REG_SYSTEM_ENV_PATH, Security::AllAccess);
     match key {
         Ok(key) => {

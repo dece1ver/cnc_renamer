@@ -1,4 +1,6 @@
-use cnc_renamer::{install, print_status, show_about, uninstall, wait_command, Command, Status};
+use cnc_renamer::{
+    install, print_status, show_about, uninstall, wait_command, Command, Status,
+};
 use crossterm::{
     cursor::{Hide, Show},
     execute,
@@ -8,6 +10,8 @@ use crossterm::{
 use std::io::stdout;
 use std::path::Path;
 use std::{env, fs};
+
+use crate::reader::try_rename;
 
 mod reader;
 
@@ -35,43 +39,29 @@ fn main() -> Result<()> {
         }
         _ => {
             for arg in args.iter().skip(1) {
-                println!("Аргумент: {}", arg);
-                if let Some((name, ext)) = reader::get_cnc_name(arg) {
-                    println!("Найдена программа ЧПУ: {}", name);
-                    let old_name = Path::new(arg);
-
-                    if let Some(dir) = old_name.parent() {
-                        let mut new_name = match ext.len() {
-                            0 => dir.join(&name),
-                            _ => dir.join(format!("{}.{}", name, ext)),
-                        };
-                        if new_name == old_name {
-                            break;
-                        };
-                        println!("Новый файл: {:#?}", new_name);
-                        let mut copy: u32 = 0;
-                        while new_name.exists() {
-                            if new_name == old_name {
-                                break;
-                            };
-                            copy += 1;
-                            new_name = match ext.len() {
-                                0 => dir.join(format!("{} ({})", name, copy)),
-                                _ => dir.join(format!("{} ({}).{}", name, copy, ext)),
-                            };
-                            println!("Новый файл уже существует...\nПроверка {:?}", new_name);
-                        }
-                        print!("Переименовывание...");
-                        if fs::rename(old_name, new_name).is_ok() {
-                            print_status(Status::Ok)
-                        } else {
-                            print_status(Status::Bad)
-                        }
+                print!("\n{}", arg);
+                let path = Path::new(arg);
+                if path.is_file() {
+                    println!(" - файл.\n");
+                    try_rename(arg);
+                } else if path.is_dir() {
+                    println!(" - директория.\n");
+                    if let Ok(entries) = fs::read_dir(arg) {
+                        entries
+                            .filter_map(|entry| entry.ok())
+                            .filter(|entry| entry.path().is_file())
+                            .for_each(|entry| {
+                                if let Some(file_path_str) = entry.path().to_str() {
+                                    println!("└───{file_path_str}");
+                                    try_rename(file_path_str);
+                                }
+                            });
+                    } else {
+                        println!("Не удалось прочитать содержимое папки.");
                     }
                 }
             }
         }
     }
-
     Ok(())
 }
