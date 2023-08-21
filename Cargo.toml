@@ -1,6 +1,6 @@
 [package]
 name = "cnc_renamer"
-version = "1.0.0"
+version = "1.0.1"
 edition = "2021"
 build = "src/build.rs"
 
@@ -15,10 +15,10 @@ OriginalFilename = "cncr.exe"
 LegalCopyright = "dece1ver © 2022"
 
 [dependencies]
-crossterm = "0.25.0"
+crossterm = "0.27.0"
 registry = "1.2.2"
 is_elevated = "0.1.2"
-clearscreen = "1.0.10"
+clearscreen = "2.0.1"
 
 [profile.release]
 opt-level = 'z'     # Optimize for size.

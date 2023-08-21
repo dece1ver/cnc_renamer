@@ -2,10 +2,7 @@ use cnc_renamer::{
     install, print_status, show_about, uninstall, wait_command, Command, Status,
 };
 use crossterm::{
-    cursor::{Hide, Show},
-    execute,
-    terminal::{Clear, ClearType, SetTitle},
-    Result,
+    execute, terminal::{SetTitle, Clear, ClearType}, cursor::{Hide, Show},
 };
 use std::io::stdout;
 use std::path::Path;
@@ -15,7 +12,7 @@ use crate::reader::try_rename;
 
 mod reader;
 
-fn main() -> Result<()> {
+fn main() -> std::io::Result<()> {
     let args: Vec<String> = env::args().collect();
     match args.len() {
         1 => {
