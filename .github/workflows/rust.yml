@@ -24,12 +24,16 @@ jobs:
         echo "Version: $file_version"
         echo "VERSION=$file_version" >> "$GITHUB_OUTPUT"
       shell: powershell
+    - name: Get version
+      env:
+        FILE_VERSION: ${{ steps.build.outputs.VERSION }}
+      run: echo "Version is $FILE_VERSION"
     - name: Upload binaries to release
       uses: svenstaro/upload-release-action@v2
       with:
         repo_token: ${{ secrets.GITHUB_TOKEN }}
         file: target/release/cncr.exe
         asset_name: cncr.exe
-        tag: ${{ steps.build.outputs.VERSION }}
+        tag: ${{ env.FILE_VERSION }}
         overwrite: true
-        body: "update"
+        body: "lastest"
