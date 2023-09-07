@@ -22,8 +22,8 @@ jobs:
         $file_version = (Get-Item ./target/release/cncr.exe).VersionInfo.FileVersion
         echo "Version: $file_version"
         echo "VERSION=$file_version" >> "$GITHUB_ENV"
-        Write-Host "VERSION is set to $file_version"
-        Write-Host "env.VERSION is set to ${{env.VERSION}}"
+        echo "VERSION is set to $file_version"
+        echo "env.VERSION is set to ${{env.VERSION}}"
       shell: powershell
     - name: Upload binaries to release
       uses: svenstaro/upload-release-action@v2
@@ -31,6 +31,6 @@ jobs:
         repo_token: ${{ secrets.GITHUB_TOKEN }}
         file: target/release/cncr.exe
         asset_name: cncr.exe
-        tag: ${{ env.VERSION }} # Используйте env.VERSION
+        tag: ${{ github.ref }}
         overwrite: true
         body: "update"
