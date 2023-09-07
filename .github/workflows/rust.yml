@@ -19,9 +19,9 @@ jobs:
     - name: Build
       run: |
         cargo build --release
-        version=$(./target/release/cncr.exe --version | awk '{print $2}')
+        $version = (./target/release/cncr.exe --version | ForEach-Object { $_.Split(' ')[1] })
         echo "Version: $version"
-        echo "::set-output name=tag::$version"
+        echo "::set-output name=tag::$version" 
     - name: Upload binaries to release
       uses: svenstaro/upload-release-action@v2
       with:
