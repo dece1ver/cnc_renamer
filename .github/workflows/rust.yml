@@ -17,13 +17,17 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     - name: Build
-      run: cargo build --release
+      run: |
+        cargo build --release
+        version=$(./target/release/cncr.exe --version | awk '{print $2}')
+        echo "Version: $version"
+        echo "::set-output name=tag::$version"
     - name: Upload binaries to release
       uses: svenstaro/upload-release-action@v2
       with:
         repo_token: ${{ secrets.GITHUB_TOKEN }}
         file: target/release/cncr.exe
         asset_name: cncr.exe
-        tag: ${{ github.ref }}
+        tag: ${{ steps.build.outputs.tag }}
         overwrite: true
         body: "update"
