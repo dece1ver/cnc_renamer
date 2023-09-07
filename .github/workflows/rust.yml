@@ -9,29 +9,28 @@ on:
 env:
   CARGO_TERM_COLOR: always
 
-  jobs:
-    build:
-      name: Publish binaries
-      runs-on: windows-latest
-  
-      steps:
-      - uses: actions/checkout@v3
-      - name: Build
-        run: |
-          cargo build --release
-          $version = (Get-Item ./target/release/cncr.exe).VersionInfo.FileVersion
-          echo "Version: $version"
-          echo "VERSION=$version" >> $GITHUB_ENV 
-      - name: Set VERSION in environment
-        run: |
-          echo "TAG_NAME=$VERSION" >> $GITHUB_ENV
-      - name: Upload binaries to release
-        uses: svenstaro/upload-release-action@v2
-        with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: target/release/cncr.exe
-          asset_name: cncr.exe
-          tag: ${{ env.TAG_NAME }}
-          overwrite: true
-          body: "update"
-  
+jobs:
+  build:
+    name: Publish binaries
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Build
+      run: |
+        cargo build --release
+        $version = (Get-Item ./target/release/cncr.exe).VersionInfo.FileVersion
+        echo "Version: $version"
+        echo "VERSION=$version" >> $GITHUB_ENV 
+    - name: Set VERSION in environment
+      run: |
+        echo "TAG_NAME=$VERSION" >> $GITHUB_ENV
+    - name: Upload binaries to release
+      uses: svenstaro/upload-release-action@v2
+      with:
+        repo_token: ${{ secrets.GITHUB_TOKEN }}
+        file: target/release/cncr.exe
+        asset_name: cncr.exe
+        tag: ${{ env.TAG_NAME }}
+        overwrite: true
+        body: "update"
