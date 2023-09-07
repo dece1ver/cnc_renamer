@@ -22,17 +22,14 @@ jobs:
         cargo build --release
         $file_version = (Get-Item ./target/release/cncr.exe).VersionInfo.FileVersion
         echo "Version: $file_version"
-        echo "VERSION=$file_version" >> "$GITHUB_OUTPUT"
-    - name: Get version
-      env:
-        FILE_VERSION: ${{ steps.build.outputs.VERSION }}
-      run: echo "Version is $FILE_VERSION"
+        echo "VERSION=$file_version" >> $GITHUB_ENV
+        echo "##[set-output name=VERSION;]$file_version"
     - name: Upload binaries to release
       uses: svenstaro/upload-release-action@v2
       with:
         repo_token: ${{ secrets.GITHUB_TOKEN }}
         file: target/release/cncr.exe
         asset_name: cncr.exe
-        tag: ${{ env.FILE_VERSION }}
+        tag: ${{ steps.build.outputs.VERSION }}
         overwrite: true
         body: "lastest"
