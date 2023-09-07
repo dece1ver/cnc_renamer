@@ -31,6 +31,6 @@ jobs:
         repo_token: ${{ secrets.GITHUB_TOKEN }}
         file: target/release/cncr.exe
         asset_name: cncr.exe
-        tag: ${{ env.VERSION }} 
+        tag: $version
         overwrite: true
         body: "update"
