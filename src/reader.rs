@@ -156,7 +156,10 @@ pub fn try_rename(file_path: &str) {
                     0 => dir.join(format!("{} ({})", name, copy)),
                     _ => dir.join(format!("{} ({}).{}", name, copy, ext)),
                 };
-                println!("    Новый файл уже существует...\n    Проверка {:?}", new_name);
+                println!(
+                    "    Новый файл уже существует...\n    Проверка {:?}",
+                    new_name
+                );
             }
             print!("    Переименовывание...");
             if fs::rename(old_name, new_name).is_ok() {

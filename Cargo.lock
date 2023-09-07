@@ -41,7 +41,7 @@ dependencies = [
 
 [[package]]
 name = "cnc_renamer"
-version = "1.0.1"
+version = "1.0.2"
 dependencies = [
  "clearscreen",
  "crossterm",

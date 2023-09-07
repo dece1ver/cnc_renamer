@@ -1,6 +1,6 @@
 [package]
 name = "cnc_renamer"
-version = "1.0.1"
+version = "1.0.2"
 edition = "2021"
 build = "src/build.rs"
 
@@ -12,7 +12,7 @@ path = "src/main.rs"
 ProductName = "CNC Renamer"
 FileDescription = "CNC Renamer"
 OriginalFilename = "cncr.exe"
-LegalCopyright = "dece1ver © 2022"
+LegalCopyright = "dece1ver © 2023"
 
 [dependencies]
 crossterm = "0.27.0"

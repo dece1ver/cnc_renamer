@@ -1,8 +1,8 @@
-use cnc_renamer::{
-    install, print_status, show_about, uninstall, wait_command, Command, Status,
-};
+use cnc_renamer::{install, print_status, show_about, uninstall, wait_command, Command, Status};
 use crossterm::{
-    execute, terminal::{SetTitle, Clear, ClearType}, cursor::{Hide, Show},
+    cursor::{Hide, Show},
+    execute,
+    terminal::{Clear, ClearType, SetTitle},
 };
 use std::io::stdout;
 use std::path::Path;

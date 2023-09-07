@@ -43,8 +43,10 @@ pub fn pause() {
     )
     .unwrap();
     loop {
-        if let Event::Key(_) = read().unwrap() {
-            break;
+        if let Event::Key(event) = read().unwrap() {
+            if event.kind == crossterm::event::KeyEventKind::Press {
+                break;
+            }
         }
     }
 }
@@ -193,28 +195,30 @@ pub fn wait_command() -> Command {
     let command;
     loop {
         if let Event::Key(event) = read().unwrap() {
-            match event.code {
-                KeyCode::Esc | KeyCode::Char('0') => {
-                    command = Command::Exit;
-                    break;
-                }
-                KeyCode::Char('1') => {
-                    if is_elevated() {
-                        if is_installed() {
-                            command = Command::Uninstall;
-                        } else {
-                            command = Command::Install;
-                        }
-
+            if event.kind == crossterm::event::KeyEventKind::Press {
+                match event.code {
+                    KeyCode::Esc | KeyCode::Char('0') => {
+                        command = Command::Exit;
                         break;
                     }
+                    KeyCode::Char('1') => {
+                        if is_elevated() {
+                            if is_installed() {
+                                command = Command::Uninstall;
+                            } else {
+                                command = Command::Install;
+                            }
+
+                            break;
+                        }
+                    }
+                    KeyCode::Char('2') => {
+                        command = Command::ShowAbout;
+                        break;
+                    }
+                    //_ => println!("{:?}", event),
+                    _ => (),
                 }
-                KeyCode::Char('2') => {
-                    command = Command::ShowAbout;
-                    break;
-                }
-                // _ => println!("{:?}", event.code),
-                _ => (),
             }
         }
     }
@@ -250,7 +254,12 @@ pub fn install(executable_path: &String) -> io::Result<()> {
         stdout(),
         Print("\nСоздание ключа реестра для файлов.......")
     )?;
-    match install_key(REG_FILE_PATH, REG_FILE_COMMAND_PATH, "%1") {
+    match install_key(
+        REG_FILE_PATH,
+        REG_FILE_COMMAND_PATH,
+        "%1",
+        "Переименовать УП",
+    ) {
         Ok(_) => print_status(Status::Ok),
         Err(_) => print_status(Status::Bad),
     };
@@ -259,7 +268,12 @@ pub fn install(executable_path: &String) -> io::Result<()> {
         stdout(),
         Print("\nСоздание ключа реестра для папок........")
     )?;
-    match install_key(REG_DIR_PATH, REG_DIR_COMMAND_PATH, "%1") {
+    match install_key(
+        REG_DIR_PATH,
+        REG_DIR_COMMAND_PATH,
+        "%1",
+        "Переименовать все УП в директории",
+    ) {
         Ok(_) => print_status(Status::Ok),
         Err(_) => print_status(Status::Bad),
     };
@@ -268,7 +282,12 @@ pub fn install(executable_path: &String) -> io::Result<()> {
         stdout(),
         Print("\nСоздание ключа реестра для папок (ф)....")
     )?;
-    match install_key(REG_BGDIR_PATH, REG_BGDIR_COMMAND_PATH, "%V") {
+    match install_key(
+        REG_BGDIR_PATH,
+        REG_BGDIR_COMMAND_PATH,
+        "%V",
+        "Переименовать все УП в директории",
+    ) {
         Ok(_) => print_status(Status::Ok),
         Err(_) => print_status(Status::Bad),
     };
@@ -299,11 +318,11 @@ pub fn install(executable_path: &String) -> io::Result<()> {
     Ok(())
 }
 
-fn install_key(base_key: &str, command_key: &str, arg: &str) -> io::Result<()> {
+fn install_key(base_key: &str, command_key: &str, arg: &str, command_name: &str) -> io::Result<()> {
     let key = Hive::ClassesRoot.create(base_key, Security::Write);
     if let Ok(key) = key {
         if let (Ok(_), Ok(_)) = (
-            key.set_value("", &Data::String("Переименовать УП".parse().unwrap())),
+            key.set_value("", &Data::String(command_name.parse().unwrap())),
             key.set_value(
                 "Icon",
                 &Data::String(
