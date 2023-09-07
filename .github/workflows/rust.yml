@@ -19,12 +19,13 @@ jobs:
     - name: Build
       run: |
         cargo build --release
-        $version = (Get-Item ./target/release/cncr.exe).VersionInfo.FileVersion
-        echo "Version: $version"
-        echo "VERSION=$version" >> $GITHUB_ENV 
+        $file_version = (Get-Item ./target/release/cncr.exe).VersionInfo.FileVersion
+        echo "Version: $file_version"
+        echo "VERSION=$file_version" >> $GITHUB_ENV 
     - name: Set VERSION in environment
       run: |
         echo "TAG_NAME=$VERSION" >> $GITHUB_ENV
+        echo "TAG_NAME is set to $VERSION"
     - name: Upload binaries to release
       uses: svenstaro/upload-release-action@v2
       with:
