@@ -48,11 +48,13 @@ fn main() -> std::io::Result<()> {
                             .filter_map(|entry| entry.ok())
                             .filter(|entry| entry.path().is_file())
                             .for_each(|entry| {
-                                if let Ok(file_path) = entry.path().strip_prefix(Path::new(arg)) {
-                                    if let Some(file_path_str) = file_path.to_str() {
-                                        println!("└───{}", file_path_str);
-                                        try_rename(file_path_str);
+                                if let Ok(rel_file_path) = entry.path().strip_prefix(Path::new(arg)) {
+                                    if let Some(abs_file_path_str) = rel_file_path.to_str() {
+                                        println!("└── {}", abs_file_path_str);
                                     }
+                                }
+                                if let Some(abs_file_path_str) = entry.path().to_str() {
+                                    try_rename(abs_file_path_str);
                                 }
                             });
                             cnc_renamer::pause();
