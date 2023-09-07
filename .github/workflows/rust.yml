@@ -19,15 +19,16 @@ jobs:
     - name: Build
       run: |
         cargo build --release
+        # Получите версию из вашего исполняемого файла (предполагается, что версия доступна в исполняемом файле)
         $version = (./target/release/cncr.exe --version | ForEach-Object { $_.Split(' ')[1] })
         echo "Version: $version"
-        echo "::set-output name=tag::$version" 
+        echo "VERSION=$version" >> $GITHUB_ENV 
     - name: Upload binaries to release
       uses: svenstaro/upload-release-action@v2
       with:
         repo_token: ${{ secrets.GITHUB_TOKEN }}
         file: target/release/cncr.exe
         asset_name: cncr.exe
-        tag: ${{ steps.build.outputs.tag }}
+        tag: ${{ env.VERSION }} 
         overwrite: true
         body: "update"
