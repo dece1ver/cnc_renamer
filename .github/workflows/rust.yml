@@ -8,6 +8,7 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  VERSION: "0"
 
 jobs:
   build:
@@ -19,9 +20,11 @@ jobs:
     - name: Build
       run: |
         cargo build --release
+        echo "VERSION"
         $version = (Get-Item ./target/release/cncr.exe).VersionInfo.FileVersion
         echo "Version: $version"
         echo "VERSION=$version" >> $GITHUB_ENV 
+        echo "env.VERSION: $env.VERSION" 
     - name: Upload binaries to release
       uses: svenstaro/upload-release-action@v2
       with:
