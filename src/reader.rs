@@ -30,6 +30,7 @@ pub fn get_cnc_name(file_path: &str) -> Option<(String, &str)> {
 }
 
 fn get_fanuc_name(file_path: &str) -> Option<(String, &str)> {
+    println!("    Проверка Fanuc");
     if let Ok(lines) = read_lines(file_path) {
         for (i, line) in lines.take(2).flatten().enumerate() {
             if i == 0 && line.starts_with('%') {
@@ -55,7 +56,7 @@ fn get_fanuc_name(file_path: &str) -> Option<(String, &str)> {
 }
 
 fn get_mazatrol_name<'a>(file_path: &str, extension: &'a str) -> Option<(String, &'a str)> {
-    println!("Mazatrol");
+    println!("    Mazatrol");
     if let Ok(mut f) = File::open(file_path) {
         let mut buffer = Vec::new();
         if f.read_to_end(&mut buffer).is_ok() {
@@ -77,6 +78,7 @@ fn get_mazatrol_name<'a>(file_path: &str, extension: &'a str) -> Option<(String,
 }
 
 fn get_sinumerik_name<'a>(file_path: &str, extension: &'a str) -> Option<(String, &'a str)> {
+    println!("    Sinumerik");
     if let Ok(lines) = read_lines(file_path) {
         if let Some(line) = lines.flatten().next() {
             if line.starts_with("MSG") && line.contains('(') && line.contains(')') {
@@ -92,6 +94,7 @@ fn get_sinumerik_name<'a>(file_path: &str, extension: &'a str) -> Option<(String
 }
 
 fn get_heidenhain_name<'a>(file_path: &str, extension: &'a str) -> Option<(String, &'a str)> {
+    println!("    Heidenhain");
     if let Ok(lines) = read_lines(file_path) {
         if let Some(line) = lines.take(1).flatten().next() {
             return if line.starts_with("BEGIN PGM") {
@@ -142,7 +145,7 @@ pub fn try_rename(file_path: &str) {
                 _ => dir.join(format!("{}.{}", name, ext)),
             };
             if new_name == old_name {
-                println!("    Переименовывание не требуется.");
+                println!("    Переименовывание не требуется.\n");
                 return;
             };
             println!("    Новое имя: {:#?}", new_name);
@@ -167,7 +170,11 @@ pub fn try_rename(file_path: &str) {
             } else {
                 print_status(Status::Bad);
             }
+            
         }
+        println!("\n")
+    } else {
+        println!("    Не программа ЧПУ или отсутствует имя.\n")
     }
-    println!("\n")
+    
 }
