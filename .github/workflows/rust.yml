@@ -23,7 +23,6 @@ jobs:
         $file_version = (Get-Item ./target/release/cncr.exe).VersionInfo.FileVersion
         echo "Version: $file_version"
         echo "VERSION=$file_version" >> "$GITHUB_OUTPUT"
-      shell: powershell
     - name: Get version
       env:
         FILE_VERSION: ${{ steps.build.outputs.VERSION }}
