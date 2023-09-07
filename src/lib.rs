@@ -1,7 +1,7 @@
 pub mod reader;
 
 use crossterm::{
-    event::{read, Event, KeyCode},
+    event::{                                                                                                                                                                                                                       read, Event, KeyCode},
     execute,
     style::{Color, Print, ResetColor, SetForegroundColor},
     terminal::disable_raw_mode,
