@@ -8,7 +8,6 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  VERSION: "0"
 
 jobs:
   build:
@@ -23,14 +22,13 @@ jobs:
         echo "VERSION"
         $version = (Get-Item ./target/release/cncr.exe).VersionInfo.FileVersion
         echo "Version: $version"
-        echo "VERSION=$version" >> $GITHUB_ENV 
-        echo "env.VERSION: $env.VERSION" 
+        Set-Item -path env:VERSION -value $version
     - name: Upload binaries to release
       uses: svenstaro/upload-release-action@v2
       with:
         repo_token: ${{ secrets.GITHUB_TOKEN }}
         file: target/release/cncr.exe
         asset_name: cncr.exe
-        tag: $version
+        tag: ${{ env.VERSION }} 
         overwrite: true
         body: "update"
