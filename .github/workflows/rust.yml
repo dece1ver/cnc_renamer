@@ -19,8 +19,7 @@ jobs:
     - name: Build
       run: |
         cargo build --release
-        # Получите версию из вашего исполняемого файла (предполагается, что версия доступна в исполняемом файле)
-        $version = (./target/release/cncr.exe --version | ForEach-Object { $_.Split(' ')[1] })
+        $version = (Get-Item ./target/release/cncr.exe).VersionInfo.FileVersion
         echo "Version: $version"
         echo "VERSION=$version" >> $GITHUB_ENV 
     - name: Upload binaries to release
