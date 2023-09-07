@@ -21,8 +21,9 @@ jobs:
         cargo build --release
         $file_version = (Get-Item ./target/release/cncr.exe).VersionInfo.FileVersion
         echo "Version: $file_version"
-        echo "VERSION=$file_version" >> $GITHUB_ENV
+        echo "VERSION=$file_version" >> "$GITHUB_ENV"
         Write-Host "VERSION is set to $file_version"
+        Write-Host "env.VERSION is set to ${{env.VERSION}}"
       shell: powershell
     - name: Upload binaries to release
       uses: svenstaro/upload-release-action@v2
