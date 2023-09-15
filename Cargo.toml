@@ -1,0 +1,31 @@
+[package]
+name = "cnc_renamer"
+version = "1.0.2"
+edition = "2021"
+build = "src/build.rs"
+
+[[bin]]
+name = "cncr"
+path = "src/main.rs"
+
+[package.metadata.winres]
+ProductName = "CNC Renamer"
+FileDescription = "CNC Renamer"
+OriginalFilename = "cncr.exe"
+LegalCopyright = "dece1ver © 2023"
+
+[dependencies]
+crossterm = "0.27.0"
+registry = "1.2.2"
+is_elevated = "0.1.2"
+clearscreen = "2.0.1"
+
+[profile.release]
+opt-level = 'z'     # Optimize for size.
+lto = true          # Enable Link Time Optimization
+codegen-units = 1   # Reduce number of codegen units to increase optimizations.
+panic = 'abort'     # Abort on panic
+strip = true        # Strip symbols from binary
+
+[build-dependencies]
+winres = "0.1"
