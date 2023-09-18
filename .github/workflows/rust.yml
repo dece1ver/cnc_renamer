@@ -30,4 +30,4 @@ jobs:
         asset_name: cncr.exe
         tag: ${{ steps.build.outputs.VERSION }}
         overwrite: true
-        body: "lastest"
+        body: "release"

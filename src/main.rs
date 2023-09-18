@@ -1,4 +1,7 @@
-use cnc_renamer::{install, print_status, show_about, uninstall, wait_command, Command, Status};
+use cnc_renamer::{print_status, Status};
+use commands::{
+    install::install, show_about::show_about, uninstall::uninstall, wait_command, Command,
+};
 use crossterm::{
     cursor::{Hide, Show},
     execute,
@@ -10,6 +13,7 @@ use std::{env, fs};
 
 use crate::reader::try_rename;
 
+mod commands;
 mod reader;
 
 fn main() -> std::io::Result<()> {
@@ -48,7 +52,8 @@ fn main() -> std::io::Result<()> {
                             .filter_map(|entry| entry.ok())
                             .filter(|entry| entry.path().is_file())
                             .for_each(|entry| {
-                                if let Ok(rel_file_path) = entry.path().strip_prefix(Path::new(arg)) {
+                                if let Ok(rel_file_path) = entry.path().strip_prefix(Path::new(arg))
+                                {
                                     if let Some(abs_file_path_str) = rel_file_path.to_str() {
                                         println!("└── {}", abs_file_path_str);
                                     }
@@ -57,7 +62,7 @@ fn main() -> std::io::Result<()> {
                                     try_rename(abs_file_path_str);
                                 }
                             });
-                            cnc_renamer::pause();
+                        cnc_renamer::pause();
                     } else {
                         println!("Не удалось прочитать содержимое папки.");
                     }

@@ -170,11 +170,9 @@ pub fn try_rename(file_path: &str) {
             } else {
                 print_status(Status::Bad);
             }
-            
         }
         println!("\n")
     } else {
         println!("    Не программа ЧПУ или отсутствует имя.\n")
     }
-    
 }
