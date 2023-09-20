@@ -1,20 +1,86 @@
 pub mod reader;
 
 use crossterm::{
+    cursor,
     event::{read, Event, KeyCode},
     execute,
     style::{Color, Print, ResetColor, SetForegroundColor},
+    terminal,
 };
+use unicode_segmentation::UnicodeSegmentation;
 
 use registry::{Data, Hive, Security};
-use std::io;
-use std::io::stdout;
+use std::io::{self, stdout, Write};
 use std::path::Path;
 use std::string::ToString;
+
+pub trait DisplayStatus {
+    fn print_status(&self);
+}
 
 pub enum Status {
     Ok,
     Bad,
+}
+
+impl DisplayStatus for Status {
+    fn print_status(&self) {
+        terminal::enable_raw_mode().unwrap();
+        stdout().flush().unwrap();
+        let (width, _) = terminal::size().unwrap();
+        let (used, _) = cursor::position().unwrap();
+        match self {
+            Status::Ok => {
+                let free = (width - used) as usize - 7;
+                let fill = String::from_utf8(vec![b'.'; free]).expect("Invalid UTF-8");
+                execute!(
+                    stdout(),
+                    SetForegroundColor(Color::DarkGrey),
+                    Print(fill),
+                    SetForegroundColor(Color::Green),
+                    Print(" [ Ok ]"),
+                    ResetColor
+                )
+                .unwrap();
+            }
+            Status::Bad => {
+                let free = (width - used) as usize - 12;
+                let fill = String::from_utf8(vec![b'.'; free]).expect("Invalid UTF-8");
+                execute!(
+                    stdout(),
+                    SetForegroundColor(Color::DarkGrey),
+                    Print(fill),
+                    SetForegroundColor(Color::Red),
+                    Print(" [ Неудача ]"),
+                    ResetColor
+                )
+                .unwrap();
+            }
+        }
+        terminal::disable_raw_mode().unwrap();
+    }
+}
+
+impl DisplayStatus for &str {
+    fn print_status(&self) {
+        terminal::enable_raw_mode().unwrap();
+        stdout().flush().unwrap();
+        let (width, _) = terminal::size().unwrap();
+        let (used, _) = cursor::position().unwrap();
+        let free = (width - used) as usize;
+        let fill = String::from_utf8(vec![b'.'; free - self.graphemes(true).count()])
+            .expect("Invalid UTF-8");
+        execute!(
+            stdout(),
+            SetForegroundColor(Color::DarkGrey),
+            Print(fill),
+            SetForegroundColor(Color::Yellow),
+            Print(self),
+            ResetColor
+        )
+        .unwrap();
+        terminal::disable_raw_mode().unwrap();
+    }
 }
 
 pub const INSTALL_PATH: &str = r"C:\Program Files\dece1ver\CNC Renamer";
@@ -145,25 +211,4 @@ pub fn install_key(
     Ok(())
 }
 
-pub fn print_status(status: Status) {
-    match status {
-        Status::Ok => {
-            execute!(
-                stdout(),
-                SetForegroundColor(Color::Green),
-                Print("[Ok]"),
-                ResetColor
-            )
-            .unwrap();
-        }
-        Status::Bad => {
-            execute!(
-                stdout(),
-                SetForegroundColor(Color::Red),
-                Print("[Неудача]"),
-                ResetColor
-            )
-            .unwrap();
-        }
-    }
-}
+//TODO print_status для &str

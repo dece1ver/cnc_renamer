@@ -1,10 +1,12 @@
 use std::ffi::OsStr;
 use std::fs::{self, File};
-use std::io;
-use std::io::{BufRead, Read};
+use std::io::{self, stdout, BufRead, Read};
 use std::path::Path;
 
-use crate::{print_status, Status};
+use crossterm::execute;
+use crossterm::style::{Color, Print, ResetColor, SetForegroundColor};
+
+use crate::{DisplayStatus, Status};
 
 const _NAMELESS: &str = "Без названия";
 const MAZATROL_EXTENSIONS: [&str; 2] = ["pbg", "pbd"];
@@ -30,7 +32,6 @@ pub fn get_cnc_name(file_path: &str) -> Option<(String, &str)> {
 }
 
 fn get_fanuc_name(file_path: &str) -> Option<(String, &str)> {
-    println!("    Проверка Fanuc");
     if let Ok(lines) = read_lines(file_path) {
         for (i, line) in lines.take(2).flatten().enumerate() {
             if i == 0 && line.starts_with('%') {
@@ -56,7 +57,6 @@ fn get_fanuc_name(file_path: &str) -> Option<(String, &str)> {
 }
 
 fn get_mazatrol_name<'a>(file_path: &str, extension: &'a str) -> Option<(String, &'a str)> {
-    println!("    Mazatrol");
     if let Ok(mut f) = File::open(file_path) {
         let mut buffer = Vec::new();
         if f.read_to_end(&mut buffer).is_ok() {
@@ -78,7 +78,6 @@ fn get_mazatrol_name<'a>(file_path: &str, extension: &'a str) -> Option<(String,
 }
 
 fn get_sinumerik_name<'a>(file_path: &str, extension: &'a str) -> Option<(String, &'a str)> {
-    println!("    Sinumerik");
     if let Ok(lines) = read_lines(file_path) {
         if let Some(line) = lines.flatten().next() {
             if line.starts_with("MSG") && line.contains('(') && line.contains(')') {
@@ -94,7 +93,6 @@ fn get_sinumerik_name<'a>(file_path: &str, extension: &'a str) -> Option<(String
 }
 
 fn get_heidenhain_name<'a>(file_path: &str, extension: &'a str) -> Option<(String, &'a str)> {
-    println!("    Heidenhain");
     if let Ok(lines) = read_lines(file_path) {
         if let Some(line) = lines.take(1).flatten().next() {
             return if line.starts_with("BEGIN PGM") {
@@ -136,43 +134,45 @@ fn remove_bad_symbols(text: &str) -> String {
 
 pub fn try_rename(file_path: &str) {
     if let Some((name, ext)) = get_cnc_name(file_path) {
-        println!("    Найдена программа ЧПУ: {}", name);
-        let old_name = Path::new(file_path);
+        let old_path = Path::new(file_path);
 
-        if let Some(dir) = old_name.parent() {
+        if let Some(dir) = old_path.parent() {
             let mut new_name = match ext.len() {
-                0 => dir.join(&name),
-                _ => dir.join(format!("{}.{}", name, ext)),
+                0 => String::from(&name),
+                _ => {
+                    format!("{name}.{ext}")
+                }
             };
-            if new_name == old_name {
-                println!("    Переименовывание не требуется.\n");
-                return;
-            };
-            println!("    Новое имя: {:#?}", new_name);
+            let mut new_path = dir.join(&new_name);
             let mut copy: u32 = 0;
-            while new_name.exists() {
-                if new_name == old_name {
-                    break;
+            while new_path.exists() {
+                if new_path == old_path {
+                    " [ не требуется ]".print_status();
+                    return;
                 };
                 copy += 1;
                 new_name = match ext.len() {
-                    0 => dir.join(format!("{} ({})", name, copy)),
-                    _ => dir.join(format!("{} ({}).{}", name, copy, ext)),
+                    0 => format!("{name} ({copy})"),
+                    _ => format!("{name} ({copy}).{ext}"),
                 };
-                println!(
-                    "    Новый файл уже существует...\n    Проверка {:?}",
-                    new_name
-                );
+                new_path = dir.join(&new_name);
             }
-            print!("    Переименовывание...");
-            if fs::rename(old_name, new_name).is_ok() {
-                print_status(Status::Ok);
+            execute!(
+                stdout(),
+                SetForegroundColor(Color::DarkGrey),
+                Print("-> "),
+                SetForegroundColor(Color::Cyan),
+                Print(format!("{new_name} ")),
+                ResetColor,
+            )
+            .unwrap();
+            if fs::rename(old_path, new_path).is_ok() {
+                Status::Ok.print_status();
             } else {
-                print_status(Status::Bad);
+                Status::Bad.print_status();
             }
         }
-        println!("\n")
     } else {
-        println!("    Не программа ЧПУ или отсутствует имя.\n")
+        " [ не программа или отсутствует имя ]".print_status();
     }
 }

@@ -1,10 +1,11 @@
-use cnc_renamer::{print_status, Status};
+use cnc_renamer::{DisplayStatus, Status};
 use commands::{
     install::install, show_about::show_about, uninstall::uninstall, wait_command, Command,
 };
 use crossterm::{
     cursor::{Hide, Show},
     execute,
+    style::{Color, Print, ResetColor, SetForegroundColor},
     terminal::{Clear, ClearType, SetTitle},
 };
 use std::io::stdout;
@@ -54,8 +55,15 @@ fn main() -> std::io::Result<()> {
                             .for_each(|entry| {
                                 if let Ok(rel_file_path) = entry.path().strip_prefix(Path::new(arg))
                                 {
-                                    if let Some(abs_file_path_str) = rel_file_path.to_str() {
-                                        println!("└── {}", abs_file_path_str);
+                                    if let Some(rel_file_path_str) = rel_file_path.to_str() {
+                                        execute!(
+                                            stdout(),
+                                            SetForegroundColor(Color::DarkGrey),
+                                            Print("└──"),
+                                            ResetColor,
+                                            Print(format!(" {rel_file_path_str} ")),
+                                        )
+                                        .unwrap();
                                     }
                                 }
                                 if let Some(abs_file_path_str) = entry.path().to_str() {
