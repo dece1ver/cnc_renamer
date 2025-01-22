@@ -8,6 +8,7 @@ use crossterm::{
     style::{Color, Print, ResetColor, SetForegroundColor},
     terminal::{Clear, ClearType, SetTitle},
 };
+use reader::archive_program;
 use std::io::stdout;
 use std::path::Path;
 use std::{env, fs};
@@ -45,7 +46,11 @@ fn main() -> std::io::Result<()> {
                 let path = Path::new(arg);
                 if path.is_file() {
                     println!(" - файл.\n");
-                    try_rename(arg);
+                    if args.contains(&"-arc".to_string()) {
+                        archive_program(arg)?;
+                    } else {
+                        try_rename(arg);
+                    }
                 } else if path.is_dir() {
                     println!(" - директория.\n");
                     if let Ok(entries) = fs::read_dir(arg) {

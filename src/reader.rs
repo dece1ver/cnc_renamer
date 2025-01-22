@@ -3,6 +3,7 @@ use std::fs::{self, File};
 use std::io::{self, stdout, BufRead, Read};
 use std::path::Path;
 
+use chrono::Local;
 use crossterm::execute;
 use crossterm::style::{Color, Print, ResetColor, SetForegroundColor};
 
@@ -13,6 +14,7 @@ const MAZATROL_EXTENSIONS: [&str; 2] = ["pbg", "pbd"];
 const HEIDENHAIN_EXTENSIONS: [&str; 1] = ["h"];
 const SINUMERIK_EXTENSIONS: [&str; 2] = ["mpf", "spf"];
 const BAD_SYMBOLS: [char; 9] = ['<', '>', ':', '\"', '/', '\\', '|', '?', '*'];
+const ARCHIVE_DIR_NAME: &str = "_";
 
 pub fn get_cnc_name(file_path: &str) -> Option<(String, &str)> {
     match get_extension(file_path) {
@@ -175,4 +177,45 @@ pub fn try_rename(file_path: &str) {
     } else {
         " [ не программа или отсутствует имя ]".print_status();
     }
+}
+
+pub fn archive_program(file_path: impl AsRef<Path>) -> io::Result<()> {
+    let path = file_path.as_ref();
+
+    if !path.exists() {
+        return Err(io::Error::new(
+            io::ErrorKind::NotFound,
+            format!("Файл '{}' не найден", path.display()),
+        ));
+    }
+
+    let parent_dir = path.parent().ok_or_else(|| {
+        io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "Невозможно получить родительскую директорию",
+        )
+    })?;
+
+    let archive_base = parent_dir.join(ARCHIVE_DIR_NAME);
+    fs::create_dir_all(&archive_base)?;
+
+    let timestamp = Local::now().format("%d%m%y.%H%M").to_string();
+    let archive_dir = archive_base.join(timestamp);
+
+    fs::create_dir_all(&archive_dir)?;
+
+    let file_name = path.file_name().ok_or_else(|| {
+        io::Error::new(io::ErrorKind::InvalidInput, "Невозможно получить имя файла")
+    })?;
+
+    let dest_path = archive_dir.join(file_name);
+
+    if dest_path.exists() {
+        return Err(io::Error::new(
+            io::ErrorKind::AlreadyExists,
+            format!("Файл '{}' уже существует в архиве", dest_path.display()),
+        ));
+    }
+    fs::rename(path, &dest_path)?;
+    Ok(())
 }

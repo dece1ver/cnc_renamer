@@ -91,6 +91,8 @@ pub const REG_BGDIR_PATH: &str = r"Directory\Background\shell\cnc_renamer";
 pub const REG_FILE_COMMAND_PATH: &str = r"*\shell\cnc_renamer\command";
 pub const REG_DIR_COMMAND_PATH: &str = r"Directory\shell\cnc_renamer\command";
 pub const REG_BGDIR_COMMAND_PATH: &str = r"Directory\Background\shell\cnc_renamer\command";
+pub const REG_ARCHIVE_PATH: &str = r"*\shell\cnc_renamer_archive";
+pub const REG_ARCHIVE_COMMAND_PATH: &str = r"*\shell\cnc_renamer_archive\command";
 pub const REG_SYSTEM_ENV_PATH: &str =
     r"SYSTEM\CurrentControlSet\Control\Session Manager\Environment";
 
@@ -151,6 +153,9 @@ pub fn is_installed() -> bool {
         || Hive::ClassesRoot
             .open(REG_BGDIR_COMMAND_PATH, Security::Read)
             .is_err()
+        || Hive::ClassesRoot
+            .open(REG_ARCHIVE_COMMAND_PATH, Security::Read)
+            .is_err()
     {
         return false;
     }
@@ -164,10 +169,10 @@ pub fn is_installed() -> bool {
     true
 }
 
-pub fn install_key(
+pub fn install_key<T: AsRef<str>>(
     base_key: &str,
     command_key: &str,
-    arg: &str,
+    args: &[T],
     command_name: &str,
 ) -> io::Result<()> {
     let key = Hive::ClassesRoot.create(base_key, Security::Write);
@@ -188,9 +193,16 @@ pub fn install_key(
                 if let Err(err) = key.set_value(
                     "",
                     &Data::String(
-                        format!("\"{}\" \"{}\"", INSTALL_EXECUTABLE_PATH, arg)
-                            .parse()
-                            .unwrap(),
+                        format!(
+                            "\"{}\" {}",
+                            INSTALL_EXECUTABLE_PATH,
+                            args.iter()
+                                .map(|arg| format!("\"{}\"", arg.as_ref()))
+                                .collect::<Vec<String>>()
+                                .join(" ")
+                        )
+                        .parse()
+                        .unwrap(),
                     ),
                 ) {
                     return Err(io::Error::new(io::ErrorKind::Other, err.to_string()));
@@ -210,5 +222,3 @@ pub fn install_key(
     }
     Ok(())
 }
-
-//TODO print_status для &str

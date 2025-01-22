@@ -1,4 +1,4 @@
-#[cfg(winfows)]
+#[cfg(windows)]
 extern crate winres;
 
 fn main() {

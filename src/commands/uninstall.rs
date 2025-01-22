@@ -7,8 +7,8 @@ use crossterm::{execute, style::Print};
 use registry::{Data, Hive, Security};
 
 use cnc_renamer::{
-    pause, DisplayStatus, Status, INSTALL_EXECUTABLE_PATH, INSTALL_PATH, REG_BGDIR_PATH,
-    REG_DIR_PATH, REG_FILE_PATH, REG_SYSTEM_ENV_PATH,
+    pause, DisplayStatus, Status, INSTALL_EXECUTABLE_PATH, INSTALL_PATH, REG_ARCHIVE_COMMAND_PATH,
+    REG_BGDIR_PATH, REG_DIR_PATH, REG_FILE_PATH, REG_SYSTEM_ENV_PATH,
 };
 
 pub fn uninstall() -> io::Result<()> {
@@ -28,6 +28,11 @@ pub fn uninstall() -> io::Result<()> {
         Print("\nУдаление из контекстного меню папок (ф) ")
     )?;
     match Hive::ClassesRoot.delete(REG_BGDIR_PATH, true) {
+        Ok(_) => Status::Ok.print_status(),
+        Err(_) => Status::Bad.print_status(),
+    }
+    execute!(stdout(), Print("\nУдаление расширенной команды "))?;
+    match Hive::ClassesRoot.delete(REG_ARCHIVE_COMMAND_PATH, true) {
         Ok(_) => Status::Ok.print_status(),
         Err(_) => Status::Bad.print_status(),
     }

@@ -20,6 +20,7 @@ registry = "1.2.2"
 is_elevated = "0.1.2"
 clearscreen = "2.0.1"
 unicode-segmentation = "1.10.1"
+chrono = "0.4.39"
 
 [profile.release]
 opt-level = 'z'     # Optimize for size.
