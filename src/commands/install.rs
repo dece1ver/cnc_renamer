@@ -77,7 +77,8 @@ pub fn install(executable_path: &String) -> io::Result<()> {
     match key {
         Ok(key) => {
             if let Ok(path) = key.value("Path") {
-                let new_path = Data::String(format!("{};{}", path, INSTALL_PATH).parse().unwrap());
+                let new_path =
+                    Data::ExpandString(format!("{};{}", path, INSTALL_PATH).parse().unwrap());
                 if key.set_value("Path", &new_path).is_ok() {
                     Status::Ok.print_status();
                 } else {

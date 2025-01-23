@@ -81,7 +81,7 @@ fn get_mazatrol_name<'a>(file_path: &str, extension: &'a str) -> Option<(String,
 
 fn get_sinumerik_name<'a>(file_path: &str, extension: &'a str) -> Option<(String, &'a str)> {
     if let Ok(lines) = read_lines(file_path) {
-        if let Some(line) = lines.flatten().next() {
+        if let Some(line) = lines.map_while(Result::ok).next() {
             if line.starts_with("MSG") && line.contains('(') && line.contains(')') {
                 if let Some(name) = line.split('(').nth(1) {
                     if let Some(name) = name.split(')').next() {
