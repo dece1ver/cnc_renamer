@@ -1,7 +1,7 @@
 [package]
-name = "cnc_renamer"
-version = "1.0.2"
-edition = "2021"
+name = "cnc_remedy"
+version = "1.1.0"
+edition = "2024"
 build = "src/build.rs"
 
 [[bin]]
@@ -9,25 +9,27 @@ name = "cncr"
 path = "src/main.rs"
 
 [package.metadata.winres]
-ProductName = "CNC Renamer"
-FileDescription = "CNC Renamer"
+ProductName = "CNC Remedy"
+FileDescription = "CNC Remedy"
 OriginalFilename = "cncr.exe"
-LegalCopyright = "dece1ver © 2023"
+LegalCopyright = "dece1ver © 2025"
 
 [dependencies]
-crossterm = "0.27.0"
-registry = "1.2.2"
+crossterm = "0.29.0"
+registry = "1.3.0"
 is_elevated = "0.1.2"
-clearscreen = "2.0.1"
-unicode-segmentation = "1.10.1"
-chrono = "0.4.39"
+clearscreen = "4.0.5"
+unicode-segmentation = "1.12.0"
+chrono = "0.4.44"
+toml = "1.0.3"
+serde = { version = "1.0.228", features = ["derive"] }
 
 [profile.release]
-opt-level = 'z'     # Optimize for size.
-lto = true          # Enable Link Time Optimization
-codegen-units = 1   # Reduce number of codegen units to increase optimizations.
-panic = 'abort'     # Abort on panic
-strip = true        # Strip symbols from binary
+opt-level = 'z'
+lto = true
+codegen-units = 1
+panic = 'abort'
+strip = true
 
 [build-dependencies]
 winres = "0.1"

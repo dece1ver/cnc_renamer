@@ -1,6 +1,6 @@
 use std::io::stdout;
 
-use cnc_renamer::is_installed;
+use crate::registry::is_installed;
 use crossterm::{
     event::{read, Event, KeyCode},
     execute,
@@ -11,12 +11,14 @@ use is_elevated::is_elevated;
 
 pub mod install;
 pub mod show_about;
+pub mod show_settings;
 pub mod uninstall;
 
 pub enum Command {
     Install,
     Uninstall,
     ShowAbout,
+    ShowSettings,
     Exit,
 }
 
@@ -50,7 +52,7 @@ pub fn wait_command() -> Command {
             SetForegroundColor(Color::Yellow),
             Print("\n[1]"),
             ResetColor,
-            Print(" Установить CNC Renamer и добавить в контекстное меню"),
+            Print(" Установить CNC Remedy и добавить в контекстное меню"),
         )
         .unwrap();
     } else if !is_elevated() && !is_installed() {
@@ -59,7 +61,7 @@ pub fn wait_command() -> Command {
             SetForegroundColor(Color::Yellow),
             Print("\n[1]"),
             ResetColor,
-            Print(" Установить CNC Renamer и добавить в контекстное меню "),
+            Print(" Установить CNC Remedy и добавить в контекстное меню "),
             SetForegroundColor(Color::Red),
             Print("(недоступно)"),
             ResetColor
@@ -71,7 +73,7 @@ pub fn wait_command() -> Command {
             SetForegroundColor(Color::Yellow),
             Print("\n[1]"),
             ResetColor,
-            Print(" Удалить CNC Renamer и убрать из контекстного меню"),
+            Print(" Удалить CNC Remedy и убрать из контекстного меню"),
         )
         .unwrap();
     } else {
@@ -80,7 +82,7 @@ pub fn wait_command() -> Command {
             SetForegroundColor(Color::Yellow),
             Print("\n[1]"),
             ResetColor,
-            Print(" Удалить CNC Renamer и убрать из контекстного меню "),
+            Print(" Удалить CNC Remedy и убрать из контекстного меню "),
             SetForegroundColor(Color::Red),
             Print("(недоступно)"),
             ResetColor
@@ -93,9 +95,19 @@ pub fn wait_command() -> Command {
         SetForegroundColor(Color::Yellow),
         Print("\n[2]"),
         ResetColor,
-        Print(" О программе "),
+        Print(" О программе"),
     )
     .unwrap();
+
+    execute!(
+        stdout(),
+        SetForegroundColor(Color::Yellow),
+        Print("\n[3]"),
+        ResetColor,
+        Print(" Настройки"),
+    )
+    .unwrap();
+
     execute!(
         stdout(),
         SetForegroundColor(Color::Yellow),
@@ -122,7 +134,6 @@ pub fn wait_command() -> Command {
                             } else {
                                 command = Command::Install;
                             }
-
                             break;
                         }
                     }
@@ -130,7 +141,10 @@ pub fn wait_command() -> Command {
                         command = Command::ShowAbout;
                         break;
                     }
-                    //_ => println!("{:?}", event),
+                    KeyCode::Char('3') => {
+                        command = Command::ShowSettings;
+                        break;
+                    }
                     _ => (),
                 }
             }

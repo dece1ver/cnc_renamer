@@ -1,18 +1,20 @@
+use crate::{
+    registry::{
+        INSTALL_EXECUTABLE_PATH, INSTALL_PATH, REG_ARCHIVE_COMMAND_PATH, REG_BGDIR_PATH,
+        REG_DIR_PATH, REG_FILE_PATH, REG_SYSTEM_ENV_PATH,
+    },
+    ui::{pause, DisplayStatus, Status},
+};
+use crossterm::{execute, style::Print};
+use registry::{Data, Hive, Security};
 use std::{
     fs,
     io::{self, stdout},
 };
 
-use crossterm::{execute, style::Print};
-use registry::{Data, Hive, Security};
-
-use cnc_renamer::{
-    pause, DisplayStatus, Status, INSTALL_EXECUTABLE_PATH, INSTALL_PATH, REG_ARCHIVE_COMMAND_PATH,
-    REG_BGDIR_PATH, REG_DIR_PATH, REG_FILE_PATH, REG_SYSTEM_ENV_PATH,
-};
-
 pub fn uninstall() -> io::Result<()> {
     clearscreen::clear().unwrap();
+
     execute!(stdout(), Print("Удаление из контекстного меню файлов "))?;
     match Hive::ClassesRoot.delete(REG_FILE_PATH, true) {
         Ok(_) => Status::Ok.print_status(),
@@ -23,10 +25,7 @@ pub fn uninstall() -> io::Result<()> {
         Ok(_) => Status::Ok.print_status(),
         Err(_) => Status::Bad.print_status(),
     }
-    execute!(
-        stdout(),
-        Print("\nУдаление из контекстного меню папок (ф) ")
-    )?;
+    execute!(stdout(), Print("\nУдаление из контекстного меню папок (ф) "))?;
     match Hive::ClassesRoot.delete(REG_BGDIR_PATH, true) {
         Ok(_) => Status::Ok.print_status(),
         Err(_) => Status::Bad.print_status(),
@@ -42,8 +41,7 @@ pub fn uninstall() -> io::Result<()> {
         Err(_) => Status::Bad.print_status(),
     }
     execute!(stdout(), Print("\nУдаление из PATH "))?;
-    let key = Hive::LocalMachine.open(REG_SYSTEM_ENV_PATH, Security::AllAccess);
-    match key {
+    match Hive::LocalMachine.open(REG_SYSTEM_ENV_PATH, Security::AllAccess) {
         Ok(key) => {
             if let Ok(path) = key.value("Path") {
                 let new_path = Data::String(
@@ -60,9 +58,10 @@ pub fn uninstall() -> io::Result<()> {
         }
         Err(e) => {
             Status::Bad.print_status();
-            println!("{:#?}", e)
+            println!("{:#?}", e);
         }
     }
+
     pause();
     Ok(())
 }

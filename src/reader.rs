@@ -7,7 +7,8 @@ use chrono::Local;
 use crossterm::execute;
 use crossterm::style::{Color, Print, ResetColor, SetForegroundColor};
 
-use crate::{DisplayStatus, Status};
+use crate::{config::Config, ui::{DisplayStatus, Status}};
+
 
 const _NAMELESS: &str = "Без названия";
 const MAZATROL_EXTENSIONS: [&str; 2] = ["pbg", "pbd"];
@@ -179,7 +180,7 @@ pub fn try_rename(file_path: &str) {
     }
 }
 
-pub fn archive_program(file_path: impl AsRef<Path>) -> io::Result<()> {
+pub fn archive_program(file_path: impl AsRef<Path>, config: &Config) -> io::Result<()> {
     let path = file_path.as_ref();
 
     if !path.exists() {
@@ -189,6 +190,17 @@ pub fn archive_program(file_path: impl AsRef<Path>) -> io::Result<()> {
         ));
     }
 
+    if config.use_queue {
+        // Режим очереди: записываем заявку, служба выполнит перемещение
+        enqueue_archive_request(path, config)
+    } else {
+        // Прямое перемещение (если есть права)
+        archive_direct(path)
+    }
+}
+
+/// Прямое перемещение файла в архивную папку _ рядом с ним
+fn archive_direct(path: &Path) -> io::Result<()> {
     let parent_dir = path.parent().ok_or_else(|| {
         io::Error::new(
             io::ErrorKind::InvalidInput,
@@ -201,7 +213,6 @@ pub fn archive_program(file_path: impl AsRef<Path>) -> io::Result<()> {
 
     let timestamp = Local::now().format("%d%m%y.%H%M").to_string();
     let archive_dir = archive_base.join(timestamp);
-
     fs::create_dir_all(&archive_dir)?;
 
     let file_name = path.file_name().ok_or_else(|| {
@@ -217,5 +228,41 @@ pub fn archive_program(file_path: impl AsRef<Path>) -> io::Result<()> {
         ));
     }
     fs::rename(path, &dest_path)?;
+    Ok(())
+}
+
+/// Запись заявки в папку очереди — служба подхватит и выполнит перемещение
+fn enqueue_archive_request(path: &Path, config: &Config) -> io::Result<()> {
+    let queue_dir = Path::new(&config.queue_path);
+
+    if !queue_dir.exists() {
+        return Err(io::Error::new(
+            io::ErrorKind::NotFound,
+            format!(
+                "Папка очереди '{}' не найдена. Проверьте настройки.",
+                queue_dir.display()
+            ),
+        ));
+    }
+
+    // Имя файла заявки: timestamp + имя файла, чтобы не было коллизий
+    let timestamp = Local::now().format("%Y%m%d_%H%M%S_%3f").to_string();
+    let file_stem = path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("unknown");
+    let request_name = format!("{timestamp}_{file_stem}.request");
+    let request_path = queue_dir.join(request_name);
+
+    // Содержимое заявки — абсолютный путь к файлу
+    let abs_path = path
+        .canonicalize()
+        .unwrap_or_else(|_| path.to_path_buf());
+
+    fs::write(
+        &request_path,
+        abs_path.to_string_lossy().as_bytes(),
+    )?;
+
     Ok(())
 }
