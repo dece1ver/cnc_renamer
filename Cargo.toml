@@ -1,6 +1,6 @@
 [package]
 name = "cnc_remedy"
-version = "1.1.0"
+version = "1.2.0"
 edition = "2024"
 build = "src/build.rs"
 
@@ -12,7 +12,7 @@ path = "src/main.rs"
 ProductName = "CNC Remedy"
 FileDescription = "CNC Remedy"
 OriginalFilename = "cncr.exe"
-LegalCopyright = "dece1ver © 2025"
+LegalCopyright = "dece1ver © 2026"
 
 [dependencies]
 crossterm = "0.29.0"
@@ -21,7 +21,7 @@ is_elevated = "0.1.2"
 clearscreen = "4.0.5"
 unicode-segmentation = "1.12.0"
 chrono = "0.4.44"
-toml = "1.0.3"
+toml = "1.1.2"
 serde = { version = "1.0.228", features = ["derive"] }
 thiserror = "2"
 
