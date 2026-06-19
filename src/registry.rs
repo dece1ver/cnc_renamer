@@ -1,77 +1,270 @@
-use registry::{Data, Hive, Security};
-use std::io;
+use crate::config::Config;
+use crate::error::{AppResult, registry_err};
+use ::registry::{Data, Hive, Security};
 use std::path::Path;
 
+/// Путь установки программы.
 pub const INSTALL_PATH: &str = r"C:\Program Files\dece1ver\CNC Remedy";
+/// Полный путь к установленному исполняемому файлу.
 pub const INSTALL_EXECUTABLE_PATH: &str = r"C:\Program Files\dece1ver\CNC Remedy\cncr.exe";
-pub const REG_FILE_PATH: &str = r"*\shell\cnc_remedy";
-pub const REG_DIR_PATH: &str = r"Directory\shell\cnc_remedy";
-pub const REG_BGDIR_PATH: &str = r"Directory\Background\shell\cnc_remedy";
-pub const REG_FILE_COMMAND_PATH: &str = r"*\shell\cnc_remedy\command";
-pub const REG_DIR_COMMAND_PATH: &str = r"Directory\shell\cnc_remedy\command";
-pub const REG_BGDIR_COMMAND_PATH: &str = r"Directory\Background\shell\cnc_remedy\command";
-pub const REG_ARCHIVE_PATH: &str = r"*\shell\cnc_remedy_archive";
-pub const REG_ARCHIVE_COMMAND_PATH: &str = r"*\shell\cnc_remedy_archive\command";
+/// Ключ реестра для подменю контекстного меню.
+const SUBMENU_KEY: &str = "CNCRemedy";
+/// Префикс пути для записей реестра.
+const CLASSES_PREFIX: &str = r"Software\Classes";
+/// Путь в реестре к системной переменной `PATH`.
 pub const REG_SYSTEM_ENV_PATH: &str =
     r"SYSTEM\CurrentControlSet\Control\Session Manager\Environment";
 
+/// Суффиксы ключей реестра для разных целей контекстного меню.
+const TARGETS: &[(&str, &str)] = &[
+    ("file", "*"),
+    ("directory", "Directory"),
+    ("background", "Directory\\Background"),
+];
+
+/// Проверяет, полностью ли установлен CNC Remedy.
 pub fn is_installed() -> bool {
-    if !Path::new(INSTALL_EXECUTABLE_PATH).exists()
-        || Hive::ClassesRoot.open(REG_FILE_PATH, Security::Read).is_err()
-        || Hive::ClassesRoot.open(REG_DIR_PATH, Security::Read).is_err()
-        || Hive::ClassesRoot.open(REG_BGDIR_PATH, Security::Read).is_err()
-        || Hive::ClassesRoot.open(REG_FILE_COMMAND_PATH, Security::Read).is_err()
-        || Hive::ClassesRoot.open(REG_DIR_COMMAND_PATH, Security::Read).is_err()
-        || Hive::ClassesRoot.open(REG_BGDIR_COMMAND_PATH, Security::Read).is_err()
-        || Hive::ClassesRoot.open(REG_ARCHIVE_COMMAND_PATH, Security::Read).is_err()
-    {
+    if !Path::new(INSTALL_EXECUTABLE_PATH).exists() {
         return false;
     }
-    if let Ok(key) = Hive::ClassesRoot.open(REG_SYSTEM_ENV_PATH, Security::Read) {
-        if let Ok(path) = key.value("Path") {
-            if !path.to_string().contains(INSTALL_PATH) {
-                return false;
-            }
+    for &(target_name, target_key) in TARGETS {
+        let key = if target_name == "background" {
+            format!(r"{CLASSES_PREFIX}\{target_key}\shell\rename")
+        } else {
+            format!(r"{CLASSES_PREFIX}\{target_key}\shell\{SUBMENU_KEY}")
+        };
+        if Hive::LocalMachine.open(&key, Security::Read).is_err() {
+            return false;
         }
+    }
+    if let Ok(key) = Hive::LocalMachine.open(REG_SYSTEM_ENV_PATH, Security::Read)
+        && let Ok(path) = key.value("Path")
+        && !path.to_string().contains(INSTALL_PATH)
+    {
+        return false;
     }
     true
 }
 
-pub fn install_key<T: AsRef<str>>(
-    base_key: &str,
-    command_key: &str,
-    args: &[T],
-    command_name: &str,
-) -> io::Result<()> {
-    let key = Hive::ClassesRoot
-        .create(base_key, Security::Write)
-        .map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
+/// Создаёт все записи реестра для контекстного меню (HKLM).
+pub fn install_all(config: &Config) -> AppResult<()> {
+    remove_legacy()?;
+    remove_hkcr_current()?;
+    remove_current_user()?;
 
-    key.set_value("", &Data::String(command_name.parse().unwrap()))
-        .map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
-    key.set_value(
-        "Icon",
-        &Data::String(
-            format!("\"{}\",2", INSTALL_EXECUTABLE_PATH).parse().unwrap(),
-        ),
-    )
-    .map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
+    for &(target_name, target_key) in TARGETS {
+        let shell_base = format!(r"{CLASSES_PREFIX}\{target_key}\shell\{SUBMENU_KEY}");
 
-    let cmd_key = Hive::ClassesRoot
-        .create(command_key, Security::Write)
-        .map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
+        if target_name == "background" {
+            let shell_root = format!(r"{CLASSES_PREFIX}\{target_key}\shell");
 
-    let cmd_value = format!(
-        "\"{}\" {}",
-        INSTALL_EXECUTABLE_PATH,
-        args.iter()
-            .map(|a| format!("\"{}\"", a.as_ref()))
-            .collect::<Vec<_>>()
-            .join(" ")
-    );
-    cmd_key
-        .set_value("", &Data::String(cmd_value.parse().unwrap()))
-        .map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
+            let _ = Hive::LocalMachine.delete(&shell_base, true);
+
+            let mut cmd_names: Vec<&String> = config.commands.keys().collect();
+            cmd_names.sort();
+
+            for name in &cmd_names {
+                let cmd_cfg = &config.commands[*name];
+                if !cmd_cfg.enabled {
+                    continue;
+                }
+                if !cmd_cfg.targets.iter().any(|t| t.as_str() == "background") {
+                    continue;
+                }
+
+                let verb_path = format!(r"{shell_root}\{name}");
+                let command_path = format!(r"{verb_path}\command");
+
+                let _ = Hive::LocalMachine.delete(&verb_path, true);
+
+                let verb_key = Hive::LocalMachine
+                    .create(&verb_path, Security::Write)
+                    .map_err(registry_err)?;
+                verb_key
+                    .set_value(
+                        "",
+                        &Data::String(cmd_cfg.label.parse().map_err(registry_err)?),
+                    )
+                    .map_err(registry_err)?;
+
+                verb_key
+                    .set_value(
+                        "Icon",
+                        &Data::String(
+                            format!("\"{INSTALL_EXECUTABLE_PATH}\",0")
+                                .parse()
+                                .map_err(registry_err)?,
+                        ),
+                    )
+                    .map_err(registry_err)?;
+
+                let cmd_key = Hive::LocalMachine
+                    .create(&command_path, Security::Write)
+                    .map_err(registry_err)?;
+                let cmd_value = format!("\"{INSTALL_EXECUTABLE_PATH}\" {name} \"%1\"");
+                cmd_key
+                    .set_value("", &Data::String(cmd_value.parse().map_err(registry_err)?))
+                    .map_err(registry_err)?;
+            }
+        } else {
+            let _ = Hive::LocalMachine.delete(&shell_base, true);
+
+            let menu_key = Hive::LocalMachine
+                .create(&shell_base, Security::Write)
+                .map_err(registry_err)?;
+
+            let menu_name = config.context_menu_name.as_deref().unwrap_or("CNC Remedy");
+
+            menu_key
+                .set_value(
+                    "MUIVerb",
+                    &Data::String(menu_name.parse().map_err(registry_err)?),
+                )
+                .map_err(registry_err)?;
+
+            menu_key
+                .set_value(
+                    "SubCommands",
+                    &Data::String("".parse().map_err(registry_err)?),
+                )
+                .map_err(registry_err)?;
+
+            menu_key
+                .set_value(
+                    "Icon",
+                    &Data::String(
+                        format!("\"{INSTALL_EXECUTABLE_PATH}\",0")
+                            .parse()
+                            .map_err(registry_err)?,
+                    ),
+                )
+                .map_err(registry_err)?;
+
+            let shell_container = format!(r"{shell_base}\Shell");
+            Hive::LocalMachine
+                .create(&shell_container, Security::Write)
+                .map_err(registry_err)?;
+
+            let mut cmd_index = 0u32;
+            let mut cmd_names: Vec<&String> = config.commands.keys().collect();
+            cmd_names.sort();
+
+            for name in &cmd_names {
+                let cmd_cfg = &config.commands[*name];
+                if !cmd_cfg.enabled {
+                    continue;
+                }
+                if !cmd_cfg.targets.iter().any(|t| t.as_str() == target_name) {
+                    continue;
+                }
+
+                cmd_index += 1;
+                let sort_prefix = format!("{:02}", cmd_index);
+                let verb_name = format!("{sort_prefix}-{name}");
+                let verb_path = format!(r"{shell_container}\{verb_name}");
+                let command_path = format!(r"{verb_path}\command");
+
+                let verb_key = Hive::LocalMachine
+                    .create(&verb_path, Security::Write)
+                    .map_err(registry_err)?;
+                verb_key
+                    .set_value(
+                        "",
+                        &Data::String(cmd_cfg.label.parse().map_err(registry_err)?),
+                    )
+                    .map_err(registry_err)?;
+
+                let cmd_key = Hive::LocalMachine
+                    .create(&command_path, Security::Write)
+                    .map_err(registry_err)?;
+                let cmd_value = format!("\"{INSTALL_EXECUTABLE_PATH}\" {name} \"%1\"");
+                cmd_key
+                    .set_value("", &Data::String(cmd_value.parse().map_err(registry_err)?))
+                    .map_err(registry_err)?;
+            }
+        }
+    }
 
     Ok(())
+}
+
+/// Удаляет старые ключи реестра с нижним подчёркиванием (legacy v1.x).
+fn remove_legacy() -> AppResult<()> {
+    let legacy_keys = [
+        r"*\shell\cnc_remedy",
+        r"Directory\shell\cnc_remedy",
+        r"Directory\Background\shell\cnc_remedy",
+        r"*\shell\cnc_remedy_archive",
+    ];
+    for key in &legacy_keys {
+        let hkcu_path = format!(r"{CLASSES_PREFIX}\{key}");
+        let _ = Hive::CurrentUser.delete(&hkcu_path, true);
+        let _ = Hive::ClassesRoot.delete(*key, true);
+    }
+    Ok(())
+}
+
+/// Удаляет ключи текущей версии (CNCRemedy) из HKCR.
+fn remove_hkcr_current() -> AppResult<()> {
+    let keys = [
+        r"*\shell\CNCRemedy",
+        r"Directory\shell\CNCRemedy",
+        r"Directory\Background\shell\CNCRemedy",
+        r"Directory\Background\shell\rename",
+    ];
+    for key in &keys {
+        let _ = Hive::ClassesRoot.delete(*key, true);
+    }
+    Ok(())
+}
+
+/// Удаляет ключи CNC Remedy из HKCU (для миграции на HKLM).
+fn remove_current_user() -> AppResult<()> {
+    for &(_, target_key) in TARGETS {
+        let key = format!(r"{CLASSES_PREFIX}\{target_key}\shell\{SUBMENU_KEY}");
+        let _ = Hive::CurrentUser.delete(key.as_str(), true);
+    }
+    Ok(())
+}
+
+/// Удаляет все записи CNC Remedy из реестра.
+pub fn uninstall_all() -> AppResult<()> {
+    remove_legacy()?;
+    remove_hkcr_current()?;
+    remove_current_user()?;
+
+    for &(target_name, target_key) in TARGETS {
+        let key = format!(r"{CLASSES_PREFIX}\{target_key}\shell\{SUBMENU_KEY}");
+        let _ = Hive::LocalMachine.delete(key.as_str(), true);
+
+        if target_name == "background" {
+            let rename_key = format!(r"{CLASSES_PREFIX}\{target_key}\shell\rename");
+            let _ = Hive::LocalMachine.delete(rename_key.as_str(), true);
+        }
+    }
+
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn constants_are_valid_paths() {
+        assert!(INSTALL_PATH.contains("CNC Remedy"));
+        assert!(INSTALL_EXECUTABLE_PATH.contains("cncr.exe"));
+        assert!(REG_SYSTEM_ENV_PATH.contains("Environment"));
+    }
+
+    #[test]
+    fn targets_are_valid() {
+        assert_eq!(TARGETS.len(), 3);
+        assert_eq!(TARGETS[0], (&"file" as &str, &"*" as &str));
+        assert_eq!(TARGETS[1], (&"directory" as &str, &"Directory" as &str));
+        assert_eq!(
+            TARGETS[2],
+            (&"background" as &str, &"Directory\\Background" as &str)
+        );
+    }
 }

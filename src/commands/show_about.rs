@@ -1,3 +1,4 @@
+use crate::error::AppResult;
 use crate::ui::return_back;
 use crossterm::{
     execute,
@@ -5,21 +6,39 @@ use crossterm::{
 };
 use std::io::stdout;
 
+/// Описание поддерживаемой системы ЧПУ и формата её имени.
 struct CncSystem {
     name: &'static str,
     format: &'static str,
 }
 
+/// Список поддерживаемых систем ЧПУ.
 const CNC_SYSTEMS: &[CncSystem] = &[
-    CncSystem { name: "Fanuc 0i",          format: "O0001(НАЗВАНИЕ)"       },
-    CncSystem { name: "Fanuc 0i-*F",       format: "<НАЗВАНИЕ>"            },
-    CncSystem { name: "Mazatrol Smart",    format: ".PBG / .PBD"           },
-    CncSystem { name: "Sinumerik 840D sl", format: "MSG(\"НАЗВАНИЕ\")"     },
-    CncSystem { name: "Heidenhain",        format: "BEGIN PGM НАЗВАНИЕ MM" },
+    CncSystem {
+        name: "Fanuc 0i",
+        format: "O0001(НАЗВАНИЕ)",
+    },
+    CncSystem {
+        name: "Fanuc 0i-*F",
+        format: "<НАЗВАНИЕ>",
+    },
+    CncSystem {
+        name: "Mazatrol Smart",
+        format: ".PBG / .PBD",
+    },
+    CncSystem {
+        name: "Sinumerik 840D sl",
+        format: "MSG(\"НАЗВАНИЕ\")",
+    },
+    CncSystem {
+        name: "Heidenhain",
+        format: "BEGIN PGM НАЗВАНИЕ MM",
+    },
 ];
 
-pub fn show_about() {
-    clearscreen::clear().unwrap();
+/// Показывает экран «О программе» с версией и списком поддерживаемых форматов.
+pub fn show_about() -> AppResult<()> {
+    clearscreen::clear()?;
 
     execute!(
         stdout(),
@@ -32,28 +51,39 @@ pub fn show_about() {
         SetForegroundColor(Color::DarkGrey),
         Print("Утилита для работы с файлами управляющих программ ЧПУ.\n"),
         ResetColor,
-    ).unwrap();
+    )?;
 
-    // Команды
     execute!(
         stdout(),
         Print("\n"),
         SetAttribute(Attribute::Underlined),
-        Print("Команды"),
+        Print("Команды контекстного меню"),
         SetAttribute(Attribute::Reset),
         Print("\n"),
-    ).unwrap();
+    )?;
+
+    execute!(
+        stdout(),
+        SetForegroundColor(Color::DarkGrey),
+        Print("  Доступные команды:\n"),
+        ResetColor,
+    )?;
 
     let commands = [
         (
             "Переименовать",
-            "ПКМ по файлу/папке или cncr <путь>",
-            "Переименовывает файл по названию УП внутри него",
+            "ПКМ по файлу/папке",
+            "Переименовывает файл по названию УП внутри (prefix/suffix/overwrite)",
         ),
         (
             "Архивировать",
-            "ПКМ по файлу или cncr <путь> -arc",
-            "Перемещает файл в папку _ рядом с ним, в подпапку с датой",
+            "ПКМ по файлу",
+            "Перемещает в _/дата/ (формат и источник времени настраиваются)",
+        ),
+        (
+            "Очистить комментарии",
+            "ПКМ по файлу",
+            "Удаляет строки комментариев (символы и keep_string настраиваются)",
         ),
     ];
 
@@ -61,16 +91,65 @@ pub fn show_about() {
         execute!(
             stdout(),
             SetForegroundColor(Color::Yellow),
-            Print(format!("  {:<16}", name)),
+            Print(format!("  {:<22}", name)),
             SetForegroundColor(Color::White),
             Print(format!("{}\n", usage)),
             SetForegroundColor(Color::DarkGrey),
-            Print(format!("  {:<16}{}\n", "", desc)),
+            Print(format!("  {:<22}{}\n", "", desc)),
             ResetColor,
-        ).unwrap();
+        )?;
     }
 
-    // Поддерживаемые СЧПУ
+    execute!(
+        stdout(),
+        Print("\n"),
+        SetAttribute(Attribute::Underlined),
+        Print("Параметры настроек (cncr.toml)"),
+        SetAttribute(Attribute::Reset),
+        Print("\n"),
+    )?;
+
+    let extra_params = [
+        (
+            "Переименовать",
+            "prefix / suffix",
+            "добавляется к имени файла",
+        ),
+        (
+            "",
+            "overwrite = true",
+            "при конфликте остаётся новейший файл",
+        ),
+        ("", "recurse = true", "обработка поддиректорий (background)"),
+        (
+            "Архивировать",
+            "date_format",
+            "формат даты подпапки (%d%m%y.%H%M)",
+        ),
+        ("", "timestamp_source", "now / modified (дата изменения)"),
+        (
+            "Очистить",
+            "comment_chars",
+            "символы комментариев (; по умолч.)",
+        ),
+        ("", "keep_string", "не удалять строки с фрагментом"),
+        ("", "strip_mode", "starts-with / contains (где искать символ)"),
+    ];
+
+    for (cmd, param, desc) in extra_params {
+        execute!(
+            stdout(),
+            SetForegroundColor(Color::Yellow),
+            Print(format!("  {:<18}", cmd)),
+            SetForegroundColor(Color::White),
+            Print(format!("{:<22}", param)),
+            SetForegroundColor(Color::DarkGrey),
+            Print(desc),
+            ResetColor,
+            Print("\n"),
+        )?;
+    }
+
     execute!(
         stdout(),
         Print("\n"),
@@ -78,7 +157,7 @@ pub fn show_about() {
         Print("Поддерживаемые СЧПУ"),
         SetAttribute(Attribute::Reset),
         Print("\n"),
-    ).unwrap();
+    )?;
 
     for sys in CNC_SYSTEMS {
         execute!(
@@ -87,14 +166,31 @@ pub fn show_about() {
             Print("  • "),
             SetForegroundColor(Color::White),
             Print(format!("{:<20}", sys.name)),
-            SetForegroundColor(Color::DarkGrey),
-            Print(sys.format),
-            ResetColor,
-            Print("\n"),
-        ).unwrap();
+        )?;
+        let fmt = sys.format;
+        if let Some(pos) = fmt.find("НАЗВАНИЕ") {
+            execute!(
+                stdout(),
+                SetForegroundColor(Color::DarkGrey),
+                Print(&fmt[..pos]),
+                SetForegroundColor(Color::Cyan),
+                Print("НАЗВАНИЕ"),
+                SetForegroundColor(Color::DarkGrey),
+                Print(&fmt[pos + "НАЗВАНИЕ".len()..]),
+                ResetColor,
+                Print("\n"),
+            )?;
+        } else {
+            execute!(
+                stdout(),
+                SetForegroundColor(Color::DarkGrey),
+                Print(fmt),
+                ResetColor,
+                Print("\n"),
+            )?;
+        }
     }
 
-    // Установка
     execute!(
         stdout(),
         Print("\n"),
@@ -105,11 +201,11 @@ pub fn show_about() {
         SetForegroundColor(Color::DarkGrey),
         Print("  Требуются права администратора. При установке:\n"),
         ResetColor,
-    ).unwrap();
+    )?;
 
     let steps = [
         r#"Копируется в "C:\Program Files\dece1ver\CNC Remedy""#,
-        "Добавляется в контекстное меню файлов и папок",
+        "Добавляется подменю CNC Remedy в контекстное меню файлов и папок",
         "Путь прописывается в PATH",
     ];
     for (i, step) in steps.iter().enumerate() {
@@ -119,17 +215,47 @@ pub fn show_about() {
             Print(format!("  {}. ", i + 1)),
             ResetColor,
             Print(format!("{}\n", step)),
-        ).unwrap();
+        )?;
+    }
+
+    execute!(
+        stdout(),
+        Print("\n"),
+        SetAttribute(Attribute::Underlined),
+        Print("CLI"),
+        SetAttribute(Attribute::Reset),
+        Print("\n"),
+    )?;
+
+    let cli_flags = [
+        ("cncr <команда> <файлы...>", "запуск команды для файлов"),
+        ("cncr install", "установить программу"),
+        ("cncr uninstall", "удалить программу"),
+        ("cncr --reset-config", "сбросить настройки"),
+        ("cncr (без аргументов)", "интерактивное меню"),
+    ];
+
+    for (usage, desc) in cli_flags {
+        execute!(
+            stdout(),
+            SetForegroundColor(Color::Yellow),
+            Print(format!("  {:<32}", usage)),
+            SetForegroundColor(Color::DarkGrey),
+            Print(desc),
+            ResetColor,
+            Print("\n"),
+        )?;
     }
 
     execute!(
         stdout(),
         Print("\n"),
         SetForegroundColor(Color::DarkGrey),
-        Print("При обработке директории вложенные папки не затрагиваются.\n"),
-        Print("Если файл с таким именем уже существует — создаётся копия с номером.\n"),
+        Print("Поведение команд (символы комментариев, обработка конфликтов,\n"),
+        Print("рекурсивный обход и т.д.) задаётся в конфигурации.\n"),
         ResetColor,
-    ).unwrap();
+    )?;
 
-    return_back();
+    return_back()?;
+    Ok(())
 }

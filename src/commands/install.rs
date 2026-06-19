@@ -1,90 +1,81 @@
-use crate::{
-    config::Config, registry::{
-        INSTALL_EXECUTABLE_PATH, INSTALL_PATH, REG_ARCHIVE_COMMAND_PATH, REG_ARCHIVE_PATH, REG_BGDIR_COMMAND_PATH, REG_BGDIR_PATH, REG_DIR_COMMAND_PATH, REG_DIR_PATH, REG_FILE_COMMAND_PATH, REG_FILE_PATH, REG_SYSTEM_ENV_PATH, install_key
-    }, ui::{DisplayStatus, Status, pause}
-};
-use crossterm::{execute, style::Print};
-use registry::{Data, Hive, Security};
-use std::{
-    fs,
-    io::{self, stdout}, path::Path,
-};
+use crate::config::Config;
+use crate::error::{AppError, AppResult};
+use crate::registry::{self, INSTALL_EXECUTABLE_PATH, INSTALL_PATH, REG_SYSTEM_ENV_PATH};
+use crate::ui::{OutputWriter, TerminalWriter};
+use ::registry::{Data, Hive, Security};
+use std::fs;
 
-pub fn install(executable_path: &String) -> io::Result<()> {
-    clearscreen::clear().unwrap();
+/// Устанавливает CNC Remedy в систему.
+///
+/// Копирует исполняемый файл и конфиг в `C:\Program Files\dece1ver\CNC Remedy`,
+/// регистрирует пункты контекстного меню и добавляет путь в системную
+/// переменную `PATH`. Требует права администратора.
+pub fn install(executable_path: &str) -> AppResult<()> {
+    clearscreen::clear()?;
+    let mut out = TerminalWriter;
 
-    execute!(stdout(), Print("Создание директории "))?;
+    out.print("Создание директории ")?;
     match fs::create_dir_all(INSTALL_PATH) {
-        Ok(_) => Status::Ok.print_status(),
-        Err(_) => Status::Bad.print_status(),
+        Ok(_) => out.status_ok()?,
+        Err(_) => out.status_bad()?,
     }
 
-    execute!(stdout(), Print("\nКопирование программы "))?;
+    out.print("\nКопирование программы ")?;
     match fs::copy(executable_path, INSTALL_EXECUTABLE_PATH) {
-        Ok(_) => Status::Ok.print_status(),
-        Err(_) => Status::Bad.print_status(),
+        Ok(_) => out.status_ok()?,
+        Err(_) => out.status_bad()?,
     }
 
-    let config_src = Path::new(executable_path).parent().unwrap().join("cncr.toml");
-    let config_dst = Path::new(INSTALL_PATH).join("cncr.toml");
-    execute!(stdout(), Print("\nКопирование конфига "))?;
-    if config_dst.exists() {
-        " [ уже существует ]".print_status();
-    } else if config_src.exists() {
-        match fs::copy(&config_src, &config_dst) {
-            Ok(_) => Status::Ok.print_status(),
-            Err(_) => Status::Bad.print_status(),
-        }
+    let config_dir = crate::config::config_path()
+        .parent()
+        .ok_or_else(|| AppError::Msg("нет родительской директории у пути конфига".into()))?
+        .to_path_buf();
+    out.print("\nСоздание директории конфига ")?;
+    if fs::create_dir_all(&config_dir).is_ok() || config_dir.exists() {
+        out.status_ok()?;
     } else {
-        // Создаём дефолтный если рядом с exe тоже нет
-    match crate::config::save_config_to(&Config::default(), &config_dst) {
-        Ok(_) => Status::Ok.print_status(),
-        Err(_) => Status::Bad.print_status(),
+        out.status_bad()?;
     }
-}
 
-    execute!(stdout(), Print("\nСоздание ключа реестра для файлов "))?;
-    match install_key(REG_FILE_PATH, REG_FILE_COMMAND_PATH, &["%1"], "Переименовать УП") {
-        Ok(_) => Status::Ok.print_status(),
-        Err(_) => Status::Bad.print_status(),
-    };
+    let config_path = crate::config::config_path();
+    out.print("\nПроверка конфига ")?;
+    if config_path.exists() {
+        out.status_info(" [ уже существует ]")?;
+    } else {
+        crate::config::save_config_to(&Config::default(), &config_path)?;
+        out.status_ok()?;
+    }
 
-    execute!(stdout(), Print("\nСоздание ключа реестра для папок "))?;
-    match install_key(REG_DIR_PATH, REG_DIR_COMMAND_PATH, &["%1"], "Переименовать все УП в директории") {
-        Ok(_) => Status::Ok.print_status(),
-        Err(_) => Status::Bad.print_status(),
-    };
+    out.print("\nДобавление контекстного меню ")?;
+    let installed_config = crate::config::load_config();
+    match registry::install_all(&installed_config) {
+        Ok(_) => out.status_ok()?,
+        Err(e) => {
+            let _ = e;
+            out.status_bad()?
+        }
+    }
 
-    execute!(stdout(), Print("\nСоздание ключа реестра для папок (ф) "))?;
-    match install_key(REG_BGDIR_PATH, REG_BGDIR_COMMAND_PATH, &["%V"], "Переименовать все УП в директории") {
-        Ok(_) => Status::Ok.print_status(),
-        Err(_) => Status::Bad.print_status(),
-    };
-
-    execute!(stdout(), Print("\nСоздание ключа реестра для файлов (архив)"))?;
-    match install_key(REG_ARCHIVE_PATH, REG_ARCHIVE_COMMAND_PATH, &["%1", "-arc"], "Архивировать УП") {
-        Ok(_) => Status::Ok.print_status(),
-        Err(_) => Status::Bad.print_status(),
-    };
-
-    execute!(stdout(), Print("\nУстановка в PATH "))?;
+    out.print("\nУстановка в PATH ")?;
     match Hive::LocalMachine.open(REG_SYSTEM_ENV_PATH, Security::AllAccess) {
         Ok(key) => {
-            if let Ok(path) = key.value("Path") {
-                let new_path = Data::ExpandString(format!("{};{}", path, INSTALL_PATH).parse().unwrap());
+            if let Ok(path_val) = key.value("Path") {
+                let new_path =
+                    Data::ExpandString(format!("{};{}", path_val, INSTALL_PATH).parse().map_err(
+                        |e| AppError::Registry(format!("ошибка парсинга пути реестра: {e}")),
+                    )?);
                 if key.set_value("Path", &new_path).is_ok() {
-                    Status::Ok.print_status();
+                    out.status_ok()?;
                 } else {
-                    Status::Bad.print_status();
+                    out.status_bad()?;
                 }
             }
         }
-        Err(e) => {
-            Status::Bad.print_status();
-            println!("{:#?}", e);
+        Err(_) => {
+            out.status_bad()?;
         }
     }
 
-    pause();
+    crate::ui::pause()?;
     Ok(())
 }

@@ -1,22 +1,30 @@
 use std::ffi::OsStr;
-use std::fs::{self, File};
-use std::io::{self, stdout, BufRead, Read};
+use std::fs::File;
+use std::io::{self, BufRead, Read};
 use std::path::Path;
 
-use chrono::Local;
-use crossterm::execute;
-use crossterm::style::{Color, Print, ResetColor, SetForegroundColor};
-
-use crate::{config::Config, ui::{DisplayStatus, Status}};
-
-
-const _NAMELESS: &str = "Без названия";
+/// Расширения файлов, определяющие формат Mazatrol.
 const MAZATROL_EXTENSIONS: [&str; 2] = ["pbg", "pbd"];
-const HEIDENHAIN_EXTENSIONS: [&str; 1] = ["h"];
-const SINUMERIK_EXTENSIONS: [&str; 2] = ["mpf", "spf"];
-const BAD_SYMBOLS: [char; 9] = ['<', '>', ':', '\"', '/', '\\', '|', '?', '*'];
-const ARCHIVE_DIR_NAME: &str = "_";
 
+/// Расширения файлов, определяющие формат Heidenhain.
+const HEIDENHAIN_EXTENSIONS: [&str; 1] = ["h"];
+
+/// Расширения файлов, определяющие формат Sinumerik.
+const SINUMERIK_EXTENSIONS: [&str; 2] = ["mpf", "spf"];
+
+/// Символы, запрещённые в именах файлов Windows (заменяются на `-`).
+const BAD_SYMBOLS: [char; 9] = ['<', '>', ':', '\"', '/', '\\', '|', '?', '*'];
+
+/// Смещение в байтах, где начинается имя программы Mazatrol.
+const MAZATROL_NAME_OFFSET: usize = 80;
+
+/// Максимальная длина имени программы Mazatrol в байтах.
+const MAZATROL_NAME_LENGTH: usize = 32;
+
+/// Определяет систему ЧПУ по расширению файла и извлекает имя программы.
+///
+/// Возвращает `(имя, расширение)`, где расширение — оригинальное
+/// расширение файла или пустая строка для Fanuc.
 pub fn get_cnc_name(file_path: &str) -> Option<(String, &str)> {
     match get_extension(file_path) {
         None => get_fanuc_name(file_path),
@@ -34,6 +42,11 @@ pub fn get_cnc_name(file_path: &str) -> Option<(String, &str)> {
     }
 }
 
+/// Парсит имя программы Fanuc из первых двух строк.
+///
+/// Поддерживаемые форматы:
+/// * `O0001(ИМЯ)` — O-номер с именем в скобках
+/// * `<ИМЯ>` — имя в угловых скобках на второй строке после `%`
 fn get_fanuc_name(file_path: &str) -> Option<(String, &str)> {
     if let Ok(lines) = read_lines(file_path) {
         for (i, line) in lines.take(2).flatten().enumerate() {
@@ -59,18 +72,18 @@ fn get_fanuc_name(file_path: &str) -> Option<(String, &str)> {
     None
 }
 
+/// Извлекает имя программы из файла Mazatrol.
+///
+/// Имя начинается со смещения 80 и имеет длину до 32 байт.
 fn get_mazatrol_name<'a>(file_path: &str, extension: &'a str) -> Option<(String, &'a str)> {
     if let Ok(mut f) = File::open(file_path) {
         let mut buffer = Vec::new();
         if f.read_to_end(&mut buffer).is_ok() {
-            let mut name = String::new();
-            for char in String::from_utf8_lossy(buffer.as_ref())
+            let name: String = String::from_utf8_lossy(&buffer)
                 .chars()
-                .skip(80)
-                .take(32)
-            {
-                name.push(char)
-            }
+                .skip(MAZATROL_NAME_OFFSET)
+                .take(MAZATROL_NAME_LENGTH)
+                .collect();
             return Some((
                 remove_bad_symbols(name.trim().trim_matches('\0')),
                 extension,
@@ -80,46 +93,53 @@ fn get_mazatrol_name<'a>(file_path: &str, extension: &'a str) -> Option<(String,
     None
 }
 
+/// Извлекает имя программы из файла Sinumerik.
+///
+/// Ищет паттерн `MSG("имя")` на первой строке.
 fn get_sinumerik_name<'a>(file_path: &str, extension: &'a str) -> Option<(String, &'a str)> {
-    if let Ok(lines) = read_lines(file_path) {
-        if let Some(line) = lines.map_while(Result::ok).next() {
-            if line.starts_with("MSG") && line.contains('(') && line.contains(')') {
-                if let Some(name) = line.split('(').nth(1) {
-                    if let Some(name) = name.split(')').next() {
-                        return Some((remove_bad_symbols(name.trim_matches('"')), extension));
-                    }
-                }
-            }
-        }
+    if let Ok(lines) = read_lines(file_path)
+        && let Some(line) = lines.map_while(Result::ok).next()
+        && line.starts_with("MSG")
+        && line.contains('(')
+        && line.contains(')')
+        && let Some(name) = line.split('(').nth(1)
+        && let Some(name) = name.split(')').next()
+    {
+        return Some((remove_bad_symbols(name.trim_matches('"')), extension));
     }
     None
 }
 
+/// Извлекает имя программы из файла Heidenhain.
+///
+/// Ищет `BEGIN PGM ИМЯ` на первой строке.
 fn get_heidenhain_name<'a>(file_path: &str, extension: &'a str) -> Option<(String, &'a str)> {
-    if let Ok(lines) = read_lines(file_path) {
-        if let Some(line) = lines.take(1).flatten().next() {
-            return if line.starts_with("BEGIN PGM") {
-                Some((
-                    remove_bad_symbols(
-                        line.replace("BEGIN PGM ", "")
-                            .trim_start_matches('0')
-                            .trim(),
-                    ),
-                    extension,
-                ))
-            } else {
-                None
-            };
-        }
+    if let Ok(lines) = read_lines(file_path)
+        && let Some(line) = lines.take(1).flatten().next()
+        && line.starts_with("BEGIN PGM")
+    {
+        return Some((
+            remove_bad_symbols(
+                line.replace("BEGIN PGM ", "")
+                    .split_whitespace()
+                    .next()
+                    .unwrap_or("")
+                    .trim_start_matches('0')
+                    .trim(),
+            ),
+            extension,
+        ));
     }
     None
 }
 
+/// Возвращает расширение файла (без точки) из строки пути.
 fn get_extension(filename: &str) -> Option<&str> {
     Path::new(filename).extension().and_then(OsStr::to_str)
 }
 
-fn read_lines<P>(filename: P) -> io::Result<io::Lines<io::BufReader<File>>>
+/// Открывает файл и возвращает построчный итератор.
+pub fn read_lines<P>(filename: P) -> io::Result<io::Lines<io::BufReader<File>>>
 where
     P: AsRef<Path>,
 {
@@ -127,7 +147,8 @@ where
     Ok(io::BufReader::new(file).lines())
 }
 
-fn remove_bad_symbols(text: &str) -> String {
+/// Заменяет символы, запрещённые в именах файлов Windows, на `-`.
+pub fn remove_bad_symbols(text: &str) -> String {
     let mut text = text.to_string();
     for bad_symbol in BAD_SYMBOLS {
         text = text.replace(bad_symbol, "-");
@@ -135,134 +156,126 @@ fn remove_bad_symbols(text: &str) -> String {
     text
 }
 
-pub fn try_rename(file_path: &str) {
-    if let Some((name, ext)) = get_cnc_name(file_path) {
-        let old_path = Path::new(file_path);
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Write;
+    use tempfile::NamedTempFile;
 
-        if let Some(dir) = old_path.parent() {
-            let mut new_name = match ext.len() {
-                0 => String::from(&name),
-                _ => {
-                    format!("{name}.{ext}")
-                }
-            };
-            let mut new_path = dir.join(&new_name);
-            let mut copy: u32 = 0;
-            while new_path.exists() {
-                if new_path == old_path {
-                    " [ не требуется ]".print_status();
-                    return;
-                };
-                copy += 1;
-                new_name = match ext.len() {
-                    0 => format!("{name} ({copy})"),
-                    _ => format!("{name} ({copy}).{ext}"),
-                };
-                new_path = dir.join(&new_name);
-            }
-            execute!(
-                stdout(),
-                SetForegroundColor(Color::DarkGrey),
-                Print("-> "),
-                SetForegroundColor(Color::Cyan),
-                Print(format!("{new_name} ")),
-                ResetColor,
-            )
-            .unwrap();
-            if fs::rename(old_path, new_path).is_ok() {
-                Status::Ok.print_status();
-            } else {
-                Status::Bad.print_status();
-            }
-        }
-    } else {
-        " [ не программа или отсутствует имя ]".print_status();
-    }
-}
-
-pub fn archive_program(file_path: impl AsRef<Path>, config: &Config) -> io::Result<()> {
-    let path = file_path.as_ref();
-
-    if !path.exists() {
-        return Err(io::Error::new(
-            io::ErrorKind::NotFound,
-            format!("Файл '{}' не найден", path.display()),
-        ));
+    fn write_temp(content: &str) -> (NamedTempFile, String) {
+        let mut f = NamedTempFile::new().unwrap();
+        write!(f, "{content}").unwrap();
+        let path = f.path().to_str().unwrap().to_string();
+        (f, path)
     }
 
-    if config.use_queue {
-        // Режим очереди: записываем заявку, служба выполнит перемещение
-        enqueue_archive_request(path, config)
-    } else {
-        // Прямое перемещение (если есть права)
-        archive_direct(path)
-    }
-}
+    // ── Fanuc ──────────────────────────────────────────────
 
-/// Прямое перемещение файла в архивную папку _ рядом с ним
-fn archive_direct(path: &Path) -> io::Result<()> {
-    let parent_dir = path.parent().ok_or_else(|| {
-        io::Error::new(
-            io::ErrorKind::InvalidInput,
-            "Невозможно получить родительскую директорию",
-        )
-    })?;
-
-    let archive_base = parent_dir.join(ARCHIVE_DIR_NAME);
-    fs::create_dir_all(&archive_base)?;
-
-    let timestamp = Local::now().format("%d%m%y.%H%M").to_string();
-    let archive_dir = archive_base.join(timestamp);
-    fs::create_dir_all(&archive_dir)?;
-
-    let file_name = path.file_name().ok_or_else(|| {
-        io::Error::new(io::ErrorKind::InvalidInput, "Невозможно получить имя файла")
-    })?;
-
-    let dest_path = archive_dir.join(file_name);
-
-    if dest_path.exists() {
-        return Err(io::Error::new(
-            io::ErrorKind::AlreadyExists,
-            format!("Файл '{}' уже существует в архиве", dest_path.display()),
-        ));
-    }
-    fs::rename(path, &dest_path)?;
-    Ok(())
-}
-
-/// Запись заявки в папку очереди — служба подхватит и выполнит перемещение
-fn enqueue_archive_request(path: &Path, config: &Config) -> io::Result<()> {
-    let queue_dir = Path::new(&config.queue_path);
-
-    if !queue_dir.exists() {
-        return Err(io::Error::new(
-            io::ErrorKind::NotFound,
-            format!(
-                "Папка очереди '{}' не найдена. Проверьте настройки.",
-                queue_dir.display()
-            ),
-        ));
+    #[test]
+    fn fanuc_percent_then_o_with_parens() {
+        let (_f, path) = write_temp("%\nO0001(МОЯ ДЕТАЛЬ)");
+        let (name, ext) = get_cnc_name(&path).unwrap();
+        assert_eq!(name, "МОЯ ДЕТАЛЬ");
+        assert_eq!(ext, "");
     }
 
-    // Имя файла заявки: timestamp + имя файла, чтобы не было коллизий
-    let timestamp = Local::now().format("%Y%m%d_%H%M%S_%3f").to_string();
-    let file_stem = path
-        .file_name()
-        .and_then(|n| n.to_str())
-        .unwrap_or("unknown");
-    let request_name = format!("{timestamp}_{file_stem}.request");
-    let request_path = queue_dir.join(request_name);
+    #[test]
+    fn fanuc_percent_then_angle() {
+        let (_f, path) = write_temp("%\n<MY-PART>");
+        let (name, ext) = get_cnc_name(&path).unwrap();
+        assert_eq!(name, "MY-PART");
+        assert_eq!(ext, "");
+    }
 
-    // Содержимое заявки — абсолютный путь к файлу
-    let abs_path = path
-        .canonicalize()
-        .unwrap_or_else(|_| path.to_path_buf());
+    #[test]
+    fn fanuc_no_name_returns_none() {
+        let (_f, path) = write_temp("N10 G0 X0\nN20 G1 Z-1");
+        assert!(get_cnc_name(&path).is_none());
+    }
 
-    fs::write(
-        &request_path,
-        abs_path.to_string_lossy().as_bytes(),
-    )?;
+    #[test]
+    fn fanuc_bad_symbols_replaced() {
+        let (_f, path) = write_temp("%\nO0001(file<name>)");
+        let (name, _) = get_cnc_name(&path).unwrap();
+        assert_eq!(name, "file-name-");
+    }
 
-    Ok(())
+    // ── Mazatrol ────────────────────────────────────────────
+
+    #[test]
+    fn mazatrol_name_from_offset() {
+        let mut f = NamedTempFile::new().unwrap();
+        let mut content = vec![b' '; 120];
+        let prog_name = b"MY-PROGRAM";
+        content[MAZATROL_NAME_OFFSET..MAZATROL_NAME_OFFSET + prog_name.len()]
+            .copy_from_slice(prog_name);
+        f.write_all(&content).unwrap();
+        let path = f.path().to_str().unwrap().to_string();
+
+        let pbg_path = format!("{path}.pbg");
+        std::fs::copy(&path, &pbg_path).unwrap();
+        let (name, ext) = get_cnc_name(&pbg_path).unwrap();
+        assert_eq!(name, "MY-PROGRAM");
+        assert_eq!(ext, "pbg");
+        let _ = std::fs::remove_file(&pbg_path);
+    }
+
+    // ── Sinumerik ──────────────────────────────────────────
+
+    #[test]
+    fn sinumerik_msg_format() {
+        let (_f, path) = write_temp("MSG(\"TestPart\")\nN10 G0 X0");
+        let mpf_path = format!("{path}.mpf");
+        std::fs::copy(&path, &mpf_path).unwrap();
+        let (name, ext) = get_cnc_name(&mpf_path).unwrap();
+        assert_eq!(name, "TestPart");
+        assert_eq!(ext, "mpf");
+        let _ = std::fs::remove_file(&mpf_path);
+    }
+
+    #[test]
+    fn sinumerik_no_msg_returns_none() {
+        let (_f, path) = write_temp("N10 G0 X0\n");
+        let mpf_path = format!("{path}.mpf");
+        std::fs::copy(&path, &mpf_path).unwrap();
+        assert!(get_cnc_name(&mpf_path).is_none());
+        let _ = std::fs::remove_file(&mpf_path);
+    }
+
+    // ── Heidenhain ──────────────────────────────────────────
+
+    #[test]
+    fn heidenhain_begin_pgm() {
+        let (_f, path) = write_temp("BEGIN PGM 0123 MM\n");
+        let h_path = format!("{path}.h");
+        std::fs::copy(&path, &h_path).unwrap();
+        let (name, ext) = get_cnc_name(&h_path).unwrap();
+        assert_eq!(name, "123");
+        assert_eq!(ext, "h");
+        let _ = std::fs::remove_file(&h_path);
+    }
+
+    #[test]
+    fn heidenhain_no_begin_returns_none() {
+        let (_f, path) = write_temp("N10 G0 X0\n");
+        let h_path = format!("{path}.h");
+        std::fs::copy(&path, &h_path).unwrap();
+        assert!(get_cnc_name(&h_path).is_none());
+        let _ = std::fs::remove_file(&h_path);
+    }
+
+    // ── remove_bad_symbols ──────────────────────────────────
+
+    #[test]
+    fn removes_bad_symbols() {
+        assert_eq!(
+            remove_bad_symbols("a<b>c:d\"e/f\\g|h?i*j"),
+            "a-b-c-d-e-f-g-h-i-j"
+        );
+    }
+
+    #[test]
+    fn leaves_good_symbols_alone() {
+        assert_eq!(remove_bad_symbols("hello world 123"), "hello world 123");
+    }
 }
