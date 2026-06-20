@@ -20,7 +20,7 @@ use std::collections::HashMap;
 use std::io::{self, stdout};
 use std::path::Path;
 use std::{env, fs};
-use ui::{TerminalWriter, pause};
+use ui::{OutputWriter, TerminalWriter, pause};
 
 fn main() -> io::Result<()> {
     let args: Vec<String> = env::args().collect();
@@ -105,22 +105,28 @@ fn process_dir(
     out: &mut TerminalWriter,
     cmd: &CommandFn,
 ) -> io::Result<()> {
-    println!(" - директория.\n");
+    println!(" {} - директория.\n", dir.display());
     if recurse {
         process_dir_recursive(dir, config, extra, out, cmd)?;
     } else if let Ok(entries) = fs::read_dir(dir) {
-        for entry in entries.flatten().filter(|e| e.path().is_file()) {
+        let files: Vec<_> = entries.flatten().filter(|e| e.path().is_file()).collect();
+        if files.is_empty() {
+            out.status_info(" [ нет файлов для обработки ]")?;
+            pause()?;
+            return Ok(());
+        }
+        for entry in &files {
             if let Some(name) = entry.file_name().to_str() {
-                execute!(
+                let _ = execute!(
                     stdout(),
                     SetForegroundColor(Color::DarkGrey),
                     Print("└──"),
                     ResetColor,
                     Print(format!(" {name} ")),
-                )?;
+                );
             }
             if let Some(abs) = entry.path().to_str() {
-                cmd(abs, config, extra, out)?;
+                let _ = cmd(abs, config, extra, out);
             }
         }
     }
@@ -144,16 +150,16 @@ fn process_dir_recursive(
                     dirs.push(path);
                 } else if path.is_file() {
                     if let Some(name) = entry.file_name().to_str() {
-                        execute!(
+                        let _ = execute!(
                             stdout(),
                             SetForegroundColor(Color::DarkGrey),
                             Print("└──"),
                             ResetColor,
                             Print(format!(" {name} ")),
-                        )?;
+                        );
                     }
                     if let Some(abs) = path.to_str() {
-                        cmd(abs, config, extra, out)?;
+                        let _ = cmd(abs, config, extra, out);
                     }
                 }
             }

@@ -49,8 +49,7 @@ pub fn is_installed() -> bool {
 /// Создаёт все записи реестра для контекстного меню (HKLM).
 pub fn install_all(config: &Config) -> AppResult<()> {
     remove_legacy()?;
-    remove_hkcr_current()?;
-    remove_current_user()?;
+    remove_current()?;
 
     for &(target_name, target_key) in TARGETS {
         let shell_base = format!(r"{CLASSES_PREFIX}\{target_key}\shell\{SUBMENU_KEY}");
@@ -101,7 +100,7 @@ pub fn install_all(config: &Config) -> AppResult<()> {
                 let cmd_key = Hive::LocalMachine
                     .create(&command_path, Security::Write)
                     .map_err(registry_err)?;
-                let cmd_value = format!("\"{INSTALL_EXECUTABLE_PATH}\" {name} \"%1\"");
+                let cmd_value = format!("\"{INSTALL_EXECUTABLE_PATH}\" {name} \"%V\"");
                 cmd_key
                     .set_value("", &Data::String(cmd_value.parse().map_err(registry_err)?))
                     .map_err(registry_err)?;
@@ -188,24 +187,33 @@ pub fn install_all(config: &Config) -> AppResult<()> {
     Ok(())
 }
 
-/// Удаляет старые ключи реестра с нижним подчёркиванием (legacy v1.x).
+/// Удаляет старые ключи реестра (legacy v1.x и cnc_renamer/nc_renamer).
 fn remove_legacy() -> AppResult<()> {
     let legacy_keys = [
+        // cnc_remedy (v1.x с подчёркиванием)
         r"*\shell\cnc_remedy",
         r"Directory\shell\cnc_remedy",
         r"Directory\Background\shell\cnc_remedy",
         r"*\shell\cnc_remedy_archive",
+        // cnc_renamer
+        r"*\shell\cnc_renamer",
+        r"Directory\shell\cnc_renamer",
+        r"Directory\Background\shell\cnc_renamer",
+        r"*\shell\cnc_renamer_archive",
+        // nc_renamer (самая первая версия)
+        r"*\shell\nc_renamer",
     ];
     for key in &legacy_keys {
-        let hkcu_path = format!(r"{CLASSES_PREFIX}\{key}");
-        let _ = Hive::CurrentUser.delete(&hkcu_path, true);
+        let path = format!(r"{CLASSES_PREFIX}\{key}");
+        let _ = Hive::LocalMachine.delete(&path, true);
+        let _ = Hive::CurrentUser.delete(&path, true);
         let _ = Hive::ClassesRoot.delete(*key, true);
     }
     Ok(())
 }
 
-/// Удаляет ключи текущей версии (CNCRemedy) из HKCR.
-fn remove_hkcr_current() -> AppResult<()> {
+/// Удаляет ключи текущей версии (CNCRemedy) из HKLM, HKCU и HKCR.
+fn remove_current() -> AppResult<()> {
     let keys = [
         r"*\shell\CNCRemedy",
         r"Directory\shell\CNCRemedy",
@@ -213,16 +221,10 @@ fn remove_hkcr_current() -> AppResult<()> {
         r"Directory\Background\shell\rename",
     ];
     for key in &keys {
+        let path = format!(r"{CLASSES_PREFIX}\{key}");
+        let _ = Hive::LocalMachine.delete(&path, true);
+        let _ = Hive::CurrentUser.delete(&path, true);
         let _ = Hive::ClassesRoot.delete(*key, true);
-    }
-    Ok(())
-}
-
-/// Удаляет ключи CNC Remedy из HKCU (для миграции на HKLM).
-fn remove_current_user() -> AppResult<()> {
-    for &(_, target_key) in TARGETS {
-        let key = format!(r"{CLASSES_PREFIX}\{target_key}\shell\{SUBMENU_KEY}");
-        let _ = Hive::CurrentUser.delete(key.as_str(), true);
     }
     Ok(())
 }
@@ -230,19 +232,7 @@ fn remove_current_user() -> AppResult<()> {
 /// Удаляет все записи CNC Remedy из реестра.
 pub fn uninstall_all() -> AppResult<()> {
     remove_legacy()?;
-    remove_hkcr_current()?;
-    remove_current_user()?;
-
-    for &(target_name, target_key) in TARGETS {
-        let key = format!(r"{CLASSES_PREFIX}\{target_key}\shell\{SUBMENU_KEY}");
-        let _ = Hive::LocalMachine.delete(key.as_str(), true);
-
-        if target_name == "background" {
-            let rename_key = format!(r"{CLASSES_PREFIX}\{target_key}\shell\rename");
-            let _ = Hive::LocalMachine.delete(rename_key.as_str(), true);
-        }
-    }
-
+    remove_current()?;
     Ok(())
 }
 

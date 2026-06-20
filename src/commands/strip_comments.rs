@@ -62,7 +62,8 @@ pub fn execute(
         .map(|s| s.as_str())
         .unwrap_or("starts-with");
 
-    let content = fs::read_to_string(file)?;
+    let bytes = fs::read(file)?;
+    let content = String::from_utf8_lossy(&bytes).to_string();
     let lines: Vec<&str> = content.lines().collect();
     let original_count = lines.len();
 

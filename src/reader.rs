@@ -1,6 +1,6 @@
 use std::ffi::OsStr;
 use std::fs::File;
-use std::io::{self, BufRead, Read};
+use std::io::{self, Read};
 use std::path::Path;
 
 /// Расширения файлов, определяющие формат Mazatrol.
@@ -49,7 +49,7 @@ pub fn get_cnc_name(file_path: &str) -> Option<(String, &str)> {
 /// * `<ИМЯ>` — имя в угловых скобках на второй строке после `%`
 fn get_fanuc_name(file_path: &str) -> Option<(String, &str)> {
     if let Ok(lines) = read_lines(file_path) {
-        for (i, line) in lines.take(2).flatten().enumerate() {
+        for (i, line) in lines.iter().take(2).enumerate() {
             if i == 0 && line.starts_with('%') {
                 continue;
             } else if i == 1 && line.starts_with('<') {
@@ -98,7 +98,7 @@ fn get_mazatrol_name<'a>(file_path: &str, extension: &'a str) -> Option<(String,
 /// Ищет паттерн `MSG("имя")` на первой строке.
 fn get_sinumerik_name<'a>(file_path: &str, extension: &'a str) -> Option<(String, &'a str)> {
     if let Ok(lines) = read_lines(file_path)
-        && let Some(line) = lines.map_while(Result::ok).next()
+        && let Some(line) = lines.iter().next()
         && line.starts_with("MSG")
         && line.contains('(')
         && line.contains(')')
@@ -115,7 +115,7 @@ fn get_sinumerik_name<'a>(file_path: &str, extension: &'a str) -> Option<(String
 /// Ищет `BEGIN PGM ИМЯ` на первой строке.
 fn get_heidenhain_name<'a>(file_path: &str, extension: &'a str) -> Option<(String, &'a str)> {
     if let Ok(lines) = read_lines(file_path)
-        && let Some(line) = lines.take(1).flatten().next()
+        && let Some(line) = lines.iter().next()
         && line.starts_with("BEGIN PGM")
     {
         return Some((
@@ -138,13 +138,14 @@ fn get_extension(filename: &str) -> Option<&str> {
     Path::new(filename).extension().and_then(OsStr::to_str)
 }
 
-/// Открывает файл и возвращает построчный итератор.
-pub fn read_lines<P>(filename: P) -> io::Result<io::Lines<io::BufReader<File>>>
+/// Открывает файл и возвращает строки с lossy UTF-8 декодингом.
+pub fn read_lines<P>(filename: P) -> io::Result<Vec<String>>
 where
     P: AsRef<Path>,
 {
-    let file = File::open(filename)?;
-    Ok(io::BufReader::new(file).lines())
+    let bytes = std::fs::read(filename)?;
+    let content = String::from_utf8_lossy(&bytes);
+    Ok(content.lines().map(|s| s.to_string()).collect())
 }
 
 /// Заменяет символы, запрещённые в именах файлов Windows, на `-`.
