@@ -98,7 +98,7 @@ fn get_mazatrol_name<'a>(file_path: &str, extension: &'a str) -> Option<(String,
 /// Ищет паттерн `MSG("имя")` на первой строке.
 fn get_sinumerik_name<'a>(file_path: &str, extension: &'a str) -> Option<(String, &'a str)> {
     if let Ok(lines) = read_lines(file_path)
-        && let Some(line) = lines.iter().next()
+        && let Some(line) = lines.first()
         && line.starts_with("MSG")
         && line.contains('(')
         && line.contains(')')
@@ -115,7 +115,7 @@ fn get_sinumerik_name<'a>(file_path: &str, extension: &'a str) -> Option<(String
 /// Ищет `BEGIN PGM ИМЯ` на первой строке.
 fn get_heidenhain_name<'a>(file_path: &str, extension: &'a str) -> Option<(String, &'a str)> {
     if let Ok(lines) = read_lines(file_path)
-        && let Some(line) = lines.iter().next()
+        && let Some(line) = lines.first()
         && line.starts_with("BEGIN PGM")
     {
         return Some((
@@ -174,9 +174,9 @@ mod tests {
 
     #[test]
     fn fanuc_percent_then_o_with_parens() {
-        let (_f, path) = write_temp("%\nO0001(МОЯ ДЕТАЛЬ)");
+        let (_f, path) = write_temp("%\nO0001(PART NAME)");
         let (name, ext) = get_cnc_name(&path).unwrap();
-        assert_eq!(name, "МОЯ ДЕТАЛЬ");
+        assert_eq!(name, "PART NAME");
         assert_eq!(ext, "");
     }
 
@@ -196,9 +196,9 @@ mod tests {
 
     #[test]
     fn fanuc_bad_symbols_replaced() {
-        let (_f, path) = write_temp("%\nO0001(file<name>)");
+        let (_f, path) = write_temp("%\nO0001(file/name>3)");
         let (name, _) = get_cnc_name(&path).unwrap();
-        assert_eq!(name, "file-name-");
+        assert_eq!(name, "file-name-3");
     }
 
     // ── Mazatrol ────────────────────────────────────────────

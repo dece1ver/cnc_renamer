@@ -115,7 +115,7 @@ impl Default for Config {
         }
     }
 }
-
+    
 /// Путь к файлу конфигурации (`%ProgramData%\dece1ver\CNC Remedy\cncr.toml`).
 pub fn config_path() -> PathBuf {
     if let Ok(progdata) = std::env::var("ProgramData") {

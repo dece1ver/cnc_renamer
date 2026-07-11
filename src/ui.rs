@@ -114,6 +114,7 @@ pub struct TestWriter {
 
 #[cfg(test)]
 impl TestWriter {
+    /// Создаёт новый `TestWriter` с пустым буфером вывода.
     pub fn new() -> Self {
         Self { output: Vec::new() }
     }

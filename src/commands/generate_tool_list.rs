@@ -25,6 +25,16 @@ enum CncVariant {
     Heidenhain,
 }
 
+/// Генерирует таблицу инструментов и вставляет её в файл УП.
+///
+/// Анализирует файл на предмет использованных инструментов (Fanuc,
+/// Sinumerik, Heidenhain) и вставляет форматированную таблицу
+/// со списком инструментов, их H/D кодами и комментариями.
+///
+/// ### `.extra`
+/// - `fanuc_milling_line`, `fanuc_lathe_line`, `sinumerik_line`,
+///   `heidenhain_line` — строка вставки таблицы (умолч. 6 для Fanuc/Sinumerik,
+///   3 для Heidenhain).
 pub fn execute(
     file: &str,
     _config: &Config,
@@ -202,45 +212,35 @@ fn parse_fanuc_milling(lines: &[String]) -> Vec<ToolInfo> {
                 break;
         }
 
-        if line_has_m6(trimmed) {
-            if let Some(tool_num) = extract_tool_number(trimmed) {
-                if current_tool != 0 {
-                    let entry = tools.entry(current_tool).or_insert_with(|| {
-                        (current_comment.clone(), 0, 0)
-                    });
-                    if entry.0.is_empty() {
-                        entry.0 = current_comment.clone();
-                    }
+        if line_has_m6(trimmed) && let Some(tool_num) = extract_tool_number(trimmed) {
+            if current_tool != 0 {
+                let entry = tools.entry(current_tool).or_insert_with(|| {
+                    (current_comment.clone(), 0, 0)
+                });
+                if entry.0.is_empty() {
+                    entry.0 = current_comment.clone();
                 }
-                current_tool = tool_num;
-                let comment = extract_comment(trimmed).unwrap_or_default();
-                if !comment.is_empty() {
-                    current_comment = comment;
-                } else {
-                    current_comment.clear();
-                }
-                continue;
             }
+            current_tool = tool_num;
+            let comment = extract_comment(trimmed).unwrap_or_default();
+            if !comment.is_empty() {
+                current_comment = comment;
+            } else {
+                current_comment.clear();
+            }
+            continue;
         }
 
-        if trimmed.contains("G43") && trimmed.contains('H') {
-            if let Some(h) = extract_h_number(trimmed) {
-                if current_tool != 0 {
-                    tools.entry(current_tool)
-                        .and_modify(|e| e.1 = h)
-                        .or_insert_with(|| (current_comment.clone(), h, 0));
-                }
-            }
+        if trimmed.contains("G43") && trimmed.contains('H') && let Some(h) = extract_h_number(trimmed) && current_tool != 0 {
+            tools.entry(current_tool)
+                .and_modify(|e| e.1 = h)
+                .or_insert_with(|| (current_comment.clone(), h, 0));
         }
 
-        if (trimmed.contains("G41") || trimmed.contains("G42")) && trimmed.contains('D') {
-            if let Some(d) = extract_d_number(trimmed) {
-                if current_tool != 0 {
-                    tools.entry(current_tool)
-                        .and_modify(|e| e.2 = d)
-                        .or_insert_with(|| (current_comment.clone(), 0, d));
-                }
-            }
+        if (trimmed.contains("G41") || trimmed.contains("G42")) && trimmed.contains('D') && let Some(d) = extract_d_number(trimmed) && current_tool != 0 {
+            tools.entry(current_tool)
+                .and_modify(|e| e.2 = d)
+                .or_insert_with(|| (current_comment.clone(), 0, d));
         }
     }
 
@@ -331,16 +331,14 @@ fn parse_sinumerik(lines: &[String]) -> Vec<ToolInfo> {
     let mut tools: HashMap<u32, String> = HashMap::new();
 
     for line in lines {
-        if line_has_m6(line) {
-            if let Some(tool_num) = extract_tool_number(line) {
-                let comment = line
-                    .split(';')
-                    .nth(1)
-                    .map(|s| s.trim().to_string())
-                    .filter(|s| !s.is_empty())
-                    .unwrap_or_else(|| UNNAMED_TOOL.to_string());
-                tools.entry(tool_num).or_insert(comment);
-            }
+        if line_has_m6(line) && let Some(tool_num) = extract_tool_number(line) {
+            let comment = line
+                .split(';')
+                .nth(1)
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty())
+                .unwrap_or_else(|| UNNAMED_TOOL.to_string());
+            tools.entry(tool_num).or_insert(comment);
         }
     }
 

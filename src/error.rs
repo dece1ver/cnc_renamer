@@ -20,7 +20,7 @@ pub enum AppError {
     Msg(String),
 }
 
-/// Удобный псевдоним для `Result<T, AppError>`.
+/// Псевдоним для `Result<T, AppError>`.
 pub type AppResult<T> = Result<T, AppError>;
 
 /// Преобразует любую ошибку с [`Display`] в [`AppError::Registry`].
@@ -35,6 +35,7 @@ impl From<AppError> for io::Error {
     }
 }
 
+/// Позволяет `?` конвертировать `clearscreen::Error` в `AppError`.
 impl From<clearscreen::Error> for AppError {
     fn from(e: clearscreen::Error) -> Self {
         AppError::Msg(e.to_string())

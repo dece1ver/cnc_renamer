@@ -38,10 +38,15 @@ pub fn registered_commands() -> HashMap<&'static str, CommandFn> {
 
 /// Доступные команды TUI-меню.
 pub enum Command {
+    /// Установка CNC Remedy и добавление в контекстное меню.
     Install,
+    /// Удаление CNC Remedy из контекстного меню.
     Uninstall,
+    /// Показ экрана «О программе».
     ShowAbout,
+    /// Показ экрана настроек.
     ShowSettings,
+    /// Выход из программы.
     Exit,
 }
 
