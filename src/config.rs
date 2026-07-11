@@ -92,6 +92,23 @@ impl Default for Config {
                 },
             },
         );
+        commands.insert(
+            "generate-tool-list".into(),
+            CommandConfig {
+                label: "Сформировать список инструмента".into(),
+                enabled: true,
+                targets: vec!["file".into()],
+                icon: None,
+                extra: {
+                    let mut m = HashMap::new();
+                    m.insert("fanuc_milling_line".into(), "6".into());
+                    m.insert("fanuc_lathe_line".into(), "6".into());
+                    m.insert("sinumerik_line".into(), "6".into());
+                    m.insert("heidenhain_line".into(), "3".into());
+                    m
+                },
+            },
+        );
         Self {
             context_menu_name: Some("CNC Remedy".into()),
             commands,

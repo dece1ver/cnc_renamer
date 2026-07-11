@@ -18,6 +18,7 @@ pub type CommandFn =
     fn(&str, &Config, &HashMap<String, String>, &mut dyn OutputWriter) -> AppResult<()>;
 
 pub mod archive;
+pub mod generate_tool_list;
 pub mod install;
 pub mod rename;
 pub mod show_about;
@@ -31,6 +32,7 @@ pub fn registered_commands() -> HashMap<&'static str, CommandFn> {
     map.insert("rename", rename::execute);
     map.insert("archive", archive::execute);
     map.insert("strip-comments", strip_comments::execute);
+    map.insert("generate-tool-list", generate_tool_list::execute);
     map
 }
 
