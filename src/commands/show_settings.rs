@@ -21,7 +21,7 @@ pub fn show_settings(config: &mut Config) -> AppResult<()> {
 
         execute!(stdout(), Print("Настройки CNC Remedy\n\n"))?;
 
-        if is_elevated() && registry::is_installed() {
+        if registry::is_installed() {
             execute!(
                 stdout(),
                 SetForegroundColor(Color::Yellow),
@@ -68,10 +68,10 @@ pub fn show_settings(config: &mut Config) -> AppResult<()> {
         terminal::disable_raw_mode()?;
 
         match key {
-            KeyCode::Char('1') if is_elevated() && registry::is_installed() => {
+            KeyCode::Char('1') if registry::is_installed() => {
                 show_commands(config)?;
             }
-            KeyCode::Char('2') if is_elevated() && registry::is_installed() => {
+            KeyCode::Char('2') if registry::is_installed() => {
                 show_params(config)?;
             }
             KeyCode::Char('d') => {

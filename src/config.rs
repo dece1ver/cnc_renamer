@@ -105,6 +105,10 @@ impl Default for Config {
                     m.insert("fanuc_lathe_line".into(), "6".into());
                     m.insert("sinumerik_line".into(), "6".into());
                     m.insert("heidenhain_line".into(), "3".into());
+                    m.insert("fanuc_milling_print_tool_number".into(), "true".into());
+                    m.insert("fanuc_lathe_print_tool_number".into(), "true".into());
+                    m.insert("sinumerik_print_tool_number".into(), "true".into());
+                    m.insert("heidenhain_print_tool_number".into(), "true".into());
                     m
                 },
             },

@@ -47,7 +47,10 @@ fn main() -> io::Result<()> {
                     Command::Exit => break,
                     Command::ShowAbout => show_about()?,
                     Command::ShowSettings => show_settings(&mut config)?,
-                    Command::Install => install(&args[0])?,
+                    Command::Install => {
+                        install(&args[0])?;
+                        config = load_config();
+                    }
                     Command::Uninstall => uninstall()?,
                 }
             }

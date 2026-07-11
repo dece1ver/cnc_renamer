@@ -10,6 +10,7 @@ use std::io::stdout;
 struct CncSystem {
     name: &'static str,
     format: &'static str,
+    exts: &'static str,
 }
 
 /// Список поддерживаемых систем ЧПУ.
@@ -17,22 +18,27 @@ const CNC_SYSTEMS: &[CncSystem] = &[
     CncSystem {
         name: "Fanuc 0i",
         format: "O0001(НАЗВАНИЕ)",
+        exts: ".nc, .cnc, ...",
     },
     CncSystem {
         name: "Fanuc 0i-*F",
         format: "<НАЗВАНИЕ>",
+        exts: ".nc, .cnc, ...",
     },
     CncSystem {
         name: "Mazatrol Smart",
-        format: ".PBG / .PBD",
+        format: "имя по смещению (байт 80)",
+        exts: ".pbg, .pbd",
     },
     CncSystem {
         name: "Sinumerik 840D sl",
         format: "MSG(\"НАЗВАНИЕ\")",
+        exts: ".mpf, .spf",
     },
     CncSystem {
         name: "Heidenhain",
         format: "BEGIN PGM НАЗВАНИЕ MM",
+        exts: ".h",
     },
 ];
 
@@ -85,6 +91,11 @@ pub fn show_about() -> AppResult<()> {
             "ПКМ по файлу",
             "Удаляет строки комментариев (символы и keep_string настраиваются)",
         ),
+        (
+            "Список инструмента",
+            "ПКМ по файлу",
+            "Генерирует таблицу инструментов из G-кода",
+        ),
     ];
 
     for (name, usage, desc) in commands {
@@ -134,6 +145,30 @@ pub fn show_about() -> AppResult<()> {
         ),
         ("", "keep_string", "не удалять строки с фрагментом"),
         ("", "strip_mode", "starts-with / contains (где искать символ)"),
+        (
+            "Список инстр.",
+            "fanuc_milling_line",
+            "строка вставки таблицы (Fanuc фрезер)",
+        ),
+        ("", "fanuc_lathe_line", "строка вставки таблицы (Fanuc токар.)"),
+        ("", "sinumerik_line", "строка вставки таблицы (Sinumerik)"),
+        ("", "heidenhain_line", "строка вставки таблицы (Heidenhain)"),
+        (
+            "",
+            "fanuc_milling_print_tool_number",
+            "выводить номер/H/D (Fanuc фрезер)",
+        ),
+        (
+            "",
+            "fanuc_lathe_print_tool_number",
+            "выводить номер (Fanuc токар.)",
+        ),
+        ("", "sinumerik_print_tool_number", "выводить номер (Sinumerik)"),
+        (
+            "",
+            "heidenhain_print_tool_number",
+            "выводить номер (Heidenhain)",
+        ),
     ];
 
     for (cmd, param, desc) in extra_params {
@@ -165,7 +200,7 @@ pub fn show_about() -> AppResult<()> {
             SetForegroundColor(Color::Yellow),
             Print("  • "),
             SetForegroundColor(Color::White),
-            Print(format!("{:<20}", sys.name)),
+            Print(format!("{:<38}", sys.name)),
         )?;
         let fmt = sys.format;
         if let Some(pos) = fmt.find("НАЗВАНИЕ") {
@@ -178,7 +213,6 @@ pub fn show_about() -> AppResult<()> {
                 SetForegroundColor(Color::DarkGrey),
                 Print(&fmt[pos + "НАЗВАНИЕ".len()..]),
                 ResetColor,
-                Print("\n"),
             )?;
         } else {
             execute!(
@@ -186,9 +220,15 @@ pub fn show_about() -> AppResult<()> {
                 SetForegroundColor(Color::DarkGrey),
                 Print(fmt),
                 ResetColor,
-                Print("\n"),
             )?;
         }
+        execute!(
+            stdout(),
+            SetForegroundColor(Color::DarkGrey),
+            Print(format!(" [{}]", sys.exts)),
+            ResetColor,
+            Print("\n"),
+        )?;
     }
 
     execute!(
@@ -205,7 +245,7 @@ pub fn show_about() -> AppResult<()> {
 
     let steps = [
         r#"Копируется в "C:\Program Files\dece1ver\CNC Remedy""#,
-        "Добавляется подменю CNC Remedy в контекстное меню файлов и папок",
+        "Добавляется подменю CNC Remedy в контекстное меню файлов, папок и фона",
         "Путь прописывается в PATH",
     ];
     for (i, step) in steps.iter().enumerate() {
@@ -231,6 +271,10 @@ pub fn show_about() -> AppResult<()> {
         ("cncr <команда> <файлы...>", "запуск команды для файлов"),
         ("cncr install", "установить программу"),
         ("cncr uninstall", "удалить программу"),
+        ("cncr rename <файлы...>", "переименовать УП"),
+        ("cncr archive <файлы...>", "архивировать УП"),
+        ("cncr strip-comments <файлы...>", "очистить комментарии"),
+        ("cncr generate-tool-list <файлы...>", "сформировать таблицу инструментов"),
         ("cncr --reset-config", "сбросить настройки"),
         ("cncr (без аргументов)", "интерактивное меню"),
     ];
@@ -239,7 +283,7 @@ pub fn show_about() -> AppResult<()> {
         execute!(
             stdout(),
             SetForegroundColor(Color::Yellow),
-            Print(format!("  {:<32}", usage)),
+            Print(format!("  {:<40}", usage)),
             SetForegroundColor(Color::DarkGrey),
             Print(desc),
             ResetColor,

@@ -35,6 +35,10 @@ enum CncVariant {
 /// - `fanuc_milling_line`, `fanuc_lathe_line`, `sinumerik_line`,
 ///   `heidenhain_line` — строка вставки таблицы (умолч. 6 для Fanuc/Sinumerik,
 ///   3 для Heidenhain).
+/// - `fanuc_milling_print_tool_number`, `fanuc_lathe_print_tool_number`,
+///   `sinumerik_print_tool_number`, `heidenhain_print_tool_number` — если
+///   `"true"` (умолч.), выводится номер инструмента, H и D коды; если
+///   `"false"` — только комментарий.
 pub fn execute(
     file: &str,
     _config: &Config,
@@ -77,7 +81,8 @@ pub fn execute(
         return Ok(());
     }
 
-    let table = format_tool_table(&tools, &variant);
+    let print_tool_number = get_print_tool_number(&variant, extra);
+    let table = format_tool_table(&tools, &variant, print_tool_number);
 
     let insert_at = insert_line.min(lines.len());
     for (i, line) in table.iter().enumerate() {
@@ -146,6 +151,16 @@ fn get_insert_line(variant: &CncVariant, extra: &HashMap<String, String>) -> usi
         .get(key)
         .and_then(|s| s.parse::<usize>().ok())
         .unwrap_or(50)
+}
+
+fn get_print_tool_number(variant: &CncVariant, extra: &HashMap<String, String>) -> bool {
+    let key = match variant {
+        CncVariant::FanucMilling => "fanuc_milling_print_tool_number",
+        CncVariant::FanucLathe => "fanuc_lathe_print_tool_number",
+        CncVariant::Sinumerik => "sinumerik_print_tool_number",
+        CncVariant::Heidenhain => "heidenhain_print_tool_number",
+    };
+    extra.get(key).map(|s| s == "true").unwrap_or(true)
 }
 
 fn extract_tool_number(line: &str) -> Option<u32> {
@@ -399,25 +414,35 @@ fn parse_heidenhain(lines: &[String]) -> Vec<ToolInfo> {
     result
 }
 
-fn format_tool_table(tools: &[ToolInfo], variant: &CncVariant) -> Vec<String> {
+fn format_tool_table(tools: &[ToolInfo], variant: &CncVariant, print_number: bool) -> Vec<String> {
     match variant {
         CncVariant::FanucMilling => tools
             .iter()
             .map(|t| {
-                format!(
-                    "(T{:02} H{:02} D{:02} - {})",
-                    t.number, t.h, t.d, t.name
-                )
+                if print_number {
+                    format!(
+                        "(T{:02} H{:02} D{:02} - {})",
+                        t.number, t.h, t.d, t.name
+                    )
+                } else {
+                    format!("({})", t.name)
+                }
             })
             .collect(),
-        CncVariant::FanucLathe => tools
-            .iter()
-            .map(|t| format!("(T{:04} - {})", t.number, t.name))
-            .collect(),
-        CncVariant::Sinumerik | CncVariant::Heidenhain => tools
-            .iter()
-            .map(|t| format!(";T{:02} - {}", t.number, t.name))
-            .collect(),
+        CncVariant::FanucLathe => tools.iter().map(|t| {
+            if print_number {
+                format!("(T{:04} - {})", t.number, t.name)
+            } else {
+                format!("({})", t.name)
+            }
+        }).collect(),
+        CncVariant::Sinumerik | CncVariant::Heidenhain => tools.iter().map(|t| {
+            if print_number {
+                format!(";T{:02} - {}", t.number, t.name)
+            } else {
+                format!(";{}", t.name)
+            }
+        }).collect(),
     }
 }
 
@@ -684,8 +709,20 @@ mod tests {
             h: 1,
             d: 1,
         }];
-        let table = format_tool_table(&tools, &CncVariant::FanucMilling);
+        let table = format_tool_table(&tools, &CncVariant::FanucMilling, true);
         assert_eq!(table, vec!["(T01 H01 D01 - 10MM ENDMILL)"]);
+    }
+
+    #[test]
+    fn format_fanuc_milling_no_number() {
+        let tools = vec![ToolInfo {
+            number: 1,
+            name: "10MM ENDMILL".to_string(),
+            h: 1,
+            d: 1,
+        }];
+        let table = format_tool_table(&tools, &CncVariant::FanucMilling, false);
+        assert_eq!(table, vec!["(10MM ENDMILL)"]);
     }
 
     #[test]
@@ -696,8 +733,20 @@ mod tests {
             h: 0,
             d: 0,
         }];
-        let table = format_tool_table(&tools, &CncVariant::FanucLathe);
+        let table = format_tool_table(&tools, &CncVariant::FanucLathe, true);
         assert_eq!(table, vec!["(T0101 - ROUGH TURN)"]);
+    }
+
+    #[test]
+    fn format_fanuc_lathe_no_number() {
+        let tools = vec![ToolInfo {
+            number: 101,
+            name: "ROUGH TURN".to_string(),
+            h: 0,
+            d: 0,
+        }];
+        let table = format_tool_table(&tools, &CncVariant::FanucLathe, false);
+        assert_eq!(table, vec!["(ROUGH TURN)"]);
     }
 
     #[test]
@@ -708,8 +757,20 @@ mod tests {
             h: 0,
             d: 0,
         }];
-        let table = format_tool_table(&tools, &CncVariant::Sinumerik);
+        let table = format_tool_table(&tools, &CncVariant::Sinumerik, true);
         assert_eq!(table, vec![";T25 - FR 6"]);
+    }
+
+    #[test]
+    fn format_sinumerik_no_number() {
+        let tools = vec![ToolInfo {
+            number: 25,
+            name: "FR 6".to_string(),
+            h: 0,
+            d: 0,
+        }];
+        let table = format_tool_table(&tools, &CncVariant::Sinumerik, false);
+        assert_eq!(table, vec![";FR 6"]);
     }
 
     #[test]
@@ -720,8 +781,20 @@ mod tests {
             h: 0,
             d: 0,
         }];
-        let table = format_tool_table(&tools, &CncVariant::Heidenhain);
+        let table = format_tool_table(&tools, &CncVariant::Heidenhain, true);
         assert_eq!(table, vec![";T01 - 10MM ENDMILL"]);
+    }
+
+    #[test]
+    fn format_heidenhain_no_number() {
+        let tools = vec![ToolInfo {
+            number: 1,
+            name: "10MM ENDMILL".to_string(),
+            h: 0,
+            d: 0,
+        }];
+        let table = format_tool_table(&tools, &CncVariant::Heidenhain, false);
+        assert_eq!(table, vec![";10MM ENDMILL"]);
     }
 
     // ── Integration: execute ───────────────────────────────
@@ -740,6 +813,7 @@ mod tests {
         let config = Config::default();
         let mut extra = HashMap::new();
         extra.insert("fanuc_milling_line".into(), "5".into());
+        extra.insert("fanuc_milling_print_tool_number".into(), "true".into());
 
         execute(file_path.to_str().unwrap(), &config, &extra, &mut writer).unwrap();
 
@@ -761,6 +835,7 @@ mod tests {
         let config = Config::default();
         let mut extra = HashMap::new();
         extra.insert("fanuc_lathe_line".into(), "3".into());
+        extra.insert("fanuc_lathe_print_tool_number".into(), "true".into());
 
         execute(file_path.to_str().unwrap(), &config, &extra, &mut writer).unwrap();
 
@@ -782,6 +857,7 @@ mod tests {
         let config = Config::default();
         let mut extra = HashMap::new();
         extra.insert("sinumerik_line".into(), "3".into());
+        extra.insert("sinumerik_print_tool_number".into(), "true".into());
 
         execute(file_path.to_str().unwrap(), &config, &extra, &mut writer).unwrap();
 
@@ -803,11 +879,125 @@ mod tests {
         let config = Config::default();
         let mut extra = HashMap::new();
         extra.insert("heidenhain_line".into(), "4".into());
+        extra.insert("heidenhain_print_tool_number".into(), "true".into());
 
         execute(file_path.to_str().unwrap(), &config, &extra, &mut writer).unwrap();
 
         let content = fs::read_to_string(&file_path).unwrap();
         assert!(content.contains(";T01 - 10MM ENDMILL"));
+    }
+
+    #[test]
+    fn execute_fanuc_milling_no_tool_number() {
+        let dir = TempDir::new().unwrap();
+        let file_path = dir.path().join("test.nc");
+        fs::write(
+            &file_path,
+            "%\r\nT1 M6 (10MM ENDMILL)\r\nG43 H1\r\nG41 D1\r\nM30\r\n",
+        )
+        .unwrap();
+
+        let mut writer = TestWriter::new();
+        let config = Config::default();
+        let mut extra = HashMap::new();
+        extra.insert("fanuc_milling_line".into(), "5".into());
+        extra.insert("fanuc_milling_print_tool_number".into(), "false".into());
+
+        execute(file_path.to_str().unwrap(), &config, &extra, &mut writer).unwrap();
+
+        let content = fs::read_to_string(&file_path).unwrap();
+        assert!(content.contains("(10MM ENDMILL)"));
+        assert!(!content.contains("T01 H01 D01"));
+    }
+
+    #[test]
+    fn execute_fanuc_lathe_no_tool_number() {
+        let dir = TempDir::new().unwrap();
+        let file_path = dir.path().join("test.nc");
+        fs::write(
+            &file_path,
+            "%\r\nT0101 (ROUGH TURN)\r\nM30\r\n",
+        )
+        .unwrap();
+
+        let mut writer = TestWriter::new();
+        let config = Config::default();
+        let mut extra = HashMap::new();
+        extra.insert("fanuc_lathe_line".into(), "3".into());
+        extra.insert("fanuc_lathe_print_tool_number".into(), "false".into());
+
+        execute(file_path.to_str().unwrap(), &config, &extra, &mut writer).unwrap();
+
+        let content = fs::read_to_string(&file_path).unwrap();
+        assert!(content.contains("(ROUGH TURN)"));
+        assert!(!content.contains("(T0101 - ROUGH TURN)"));
+    }
+
+    #[test]
+    fn execute_sinumerik_no_tool_number() {
+        let dir = TempDir::new().unwrap();
+        let file_path = dir.path().join("test.mpf");
+        fs::write(
+            &file_path,
+            "MSG(\"TEST\")\r\nT25 M6;FR 6\r\nM30\r\n",
+        )
+        .unwrap();
+
+        let mut writer = TestWriter::new();
+        let config = Config::default();
+        let mut extra = HashMap::new();
+        extra.insert("sinumerik_line".into(), "3".into());
+        extra.insert("sinumerik_print_tool_number".into(), "false".into());
+
+        execute(file_path.to_str().unwrap(), &config, &extra, &mut writer).unwrap();
+
+        let content = fs::read_to_string(&file_path).unwrap();
+        assert!(content.contains(";FR 6"));
+        assert!(!content.contains(";T25 - FR 6"));
+    }
+
+    #[test]
+    fn execute_heidenhain_no_tool_number() {
+        let dir = TempDir::new().unwrap();
+        let file_path = dir.path().join("test.h");
+        fs::write(
+            &file_path,
+            "BEGIN PGM TEST MM\r\n; 10MM ENDMILL\r\nTOOL CALL 1 Z S1000\r\nM30\r\n",
+        )
+        .unwrap();
+
+        let mut writer = TestWriter::new();
+        let config = Config::default();
+        let mut extra = HashMap::new();
+        extra.insert("heidenhain_line".into(), "4".into());
+        extra.insert("heidenhain_print_tool_number".into(), "false".into());
+
+        execute(file_path.to_str().unwrap(), &config, &extra, &mut writer).unwrap();
+
+        let content = fs::read_to_string(&file_path).unwrap();
+        assert!(content.contains(";10MM ENDMILL"));
+        assert!(!content.contains(";T01 -"));
+    }
+
+    #[test]
+    fn execute_print_tool_number_defaults_to_true() {
+        let dir = TempDir::new().unwrap();
+        let file_path = dir.path().join("test.nc");
+        fs::write(
+            &file_path,
+            "%\r\nT1 M6 (10MM ENDMILL)\r\nG43 H1\r\nG41 D1\r\nM30\r\n",
+        )
+        .unwrap();
+
+        let mut writer = TestWriter::new();
+        let config = Config::default();
+        let mut extra = HashMap::new();
+        extra.insert("fanuc_milling_line".into(), "5".into());
+
+        execute(file_path.to_str().unwrap(), &config, &extra, &mut writer).unwrap();
+
+        let content = fs::read_to_string(&file_path).unwrap();
+        assert!(content.contains("(T01 H01 D01 - 10MM ENDMILL)"));
     }
 
     #[test]
