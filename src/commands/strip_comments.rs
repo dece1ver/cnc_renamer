@@ -299,11 +299,7 @@ mod tests {
     fn keeps_keep_string_in_contains_mode() {
         let dir = TempDir::new().unwrap();
         let file_path = dir.path().join("test.mpf");
-        fs::write(
-            &file_path,
-            "N10 G0 X0 ;MSG(\"test\")\r\nN20 G1 Z-1\r\n",
-        )
-        .unwrap();
+        fs::write(&file_path, "N10 G0 X0 ;MSG(\"test\")\r\nN20 G1 Z-1\r\n").unwrap();
 
         let mut writer = TestWriter::new();
         let config = Config::default();

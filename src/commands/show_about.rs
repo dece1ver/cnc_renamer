@@ -144,13 +144,21 @@ pub fn show_about() -> AppResult<()> {
             "символы комментариев (; по умолч.)",
         ),
         ("", "keep_string", "не удалять строки с фрагментом"),
-        ("", "strip_mode", "starts-with / contains (где искать символ)"),
+        (
+            "",
+            "strip_mode",
+            "starts-with / contains (где искать символ)",
+        ),
         (
             "Список инстр.",
             "fanuc_milling_line",
             "строка вставки таблицы (Fanuc фрезер)",
         ),
-        ("", "fanuc_lathe_line", "строка вставки таблицы (Fanuc токар.)"),
+        (
+            "",
+            "fanuc_lathe_line",
+            "строка вставки таблицы (Fanuc токар.)",
+        ),
         ("", "sinumerik_line", "строка вставки таблицы (Sinumerik)"),
         ("", "heidenhain_line", "строка вставки таблицы (Heidenhain)"),
         (
@@ -163,7 +171,11 @@ pub fn show_about() -> AppResult<()> {
             "fanuc_lathe_print_tool_number",
             "выводить номер (Fanuc токар.)",
         ),
-        ("", "sinumerik_print_tool_number", "выводить номер (Sinumerik)"),
+        (
+            "",
+            "sinumerik_print_tool_number",
+            "выводить номер (Sinumerik)",
+        ),
         (
             "",
             "heidenhain_print_tool_number",
@@ -274,7 +286,10 @@ pub fn show_about() -> AppResult<()> {
         ("cncr rename <файлы...>", "переименовать УП"),
         ("cncr archive <файлы...>", "архивировать УП"),
         ("cncr strip-comments <файлы...>", "очистить комментарии"),
-        ("cncr generate-tool-list <файлы...>", "сформировать таблицу инструментов"),
+        (
+            "cncr generate-tool-list <файлы...>",
+            "сформировать таблицу инструментов",
+        ),
         ("cncr --reset-config", "сбросить настройки"),
         ("cncr (без аргументов)", "интерактивное меню"),
     ];

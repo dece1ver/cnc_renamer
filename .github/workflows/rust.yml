@@ -13,6 +13,8 @@ jobs:
   build:
     name: Publish binaries
     runs-on: windows-latest
+    permissions:
+      contents: write
 
     steps:
     - uses: actions/checkout@v3
@@ -23,11 +25,11 @@ jobs:
         $file_version = (Get-Item ./target/release/cncr.exe).VersionInfo.FileVersion
         "VERSION=$file_version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
     - name: Upload binaries to release
-      uses: svenstaro/upload-release-action@v2
+      uses: softprops/action-gh-release@v2
       with:
-        repo_token: ${{ secrets.GITHUB_TOKEN }}
-        file: target/release/cncr.exe
-        asset_name: cncr.exe
-        tag: ${{ steps.build.outputs.VERSION }}
-        overwrite: true
+        files: |
+          target/release/cncr.exe
+          target/release/cnctt.exe
+        tag_name: ${{ steps.build.outputs.VERSION }}
         body: "release"
+        overwrite: true

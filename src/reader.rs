@@ -138,14 +138,16 @@ fn get_extension(filename: &str) -> Option<&str> {
     Path::new(filename).extension().and_then(OsStr::to_str)
 }
 
-/// Открывает файл и возвращает строки с lossy UTF-8 декодингом.
+/// Открывает файл и возвращает строки с поддержкой кодировок Windows (CP1251).
 pub fn read_lines<P>(filename: P) -> io::Result<Vec<String>>
 where
     P: AsRef<Path>,
 {
     let bytes = std::fs::read(filename)?;
-    let content = String::from_utf8_lossy(&bytes);
-    Ok(content.lines().map(|s| s.to_string()).collect())
+    Ok(cnc_remedy::text::decode_bytes(&bytes)
+        .lines()
+        .map(|s| s.to_string())
+        .collect())
 }
 
 /// Заменяет символы, запрещённые в именах файлов Windows, на `-`.

@@ -250,11 +250,8 @@ mod tests {
     #[test]
     fn targets_are_valid() {
         assert_eq!(TARGETS.len(), 3);
-        assert_eq!(TARGETS[0], (&"file" as &str, &"*" as &str));
-        assert_eq!(TARGETS[1], (&"directory" as &str, &"Directory" as &str));
-        assert_eq!(
-            TARGETS[2],
-            (&"background" as &str, &"Directory\\Background" as &str)
-        );
+        assert_eq!(TARGETS[0], ("file", "*"));
+        assert_eq!(TARGETS[1], ("directory", "Directory"));
+        assert_eq!(TARGETS[2], ("background", "Directory\\Background"));
     }
 }
